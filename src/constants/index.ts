@@ -30,24 +30,24 @@ export const CURRENCIES: Record<CurrencyCode, CurrencyInfo> = {
 
 export const COLORS = {
   // Core brand
-  primary:        '#1A6BFF',
-  primaryDark:    '#0D4FCC',
-  primaryLight:   '#4D8BFF',
+  primary:        '#0D4CC6',
+  primaryDark:    '#0A3084',
+  primaryLight:   '#3A7AFA',
   accent:         '#00D4AA',
   accentDark:     '#00A884',
 
-  // Background layers (dark theme)
-  bg0:            '#0A0E1A',
-  bg1:            '#0F1422',
-  bg2:            '#141928',
-  bg3:            '#1C2235',
-  card:           '#1C2235',
-  cardBorder:     '#252D42',
+  // Background layers (light theme)
+  bg0:            '#F4F6F9',
+  bg1:            '#FFFFFF',
+  bg2:            '#F8FAFC',
+  bg3:            '#E2E8F0',
+  card:           '#FFFFFF',
+  cardBorder:     '#F1F5F9',
 
   // Text
-  textPrimary:    '#FFFFFF',
-  textSecondary:  '#8892AA',
-  textMuted:      '#4A5568',
+  textPrimary:    '#0F172A',
+  textSecondary:  '#64748B',
+  textMuted:      '#94A3B8',
 
   // Status
   income:         '#00D4AA',

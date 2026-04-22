@@ -1,25 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated,
-  Dimensions, Alert,
+  Dimensions, Alert, ScrollView
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import { ShieldCheck, Camera, AlertCircle, CheckCircle2, Eye } from 'lucide-react-native';
+import { ShieldCheck, Camera, AlertCircle, CheckCircle2, Eye, X, Check, Loader, Lock, Sun, HelpCircle } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { useFinanceStore } from '@/store';
 import { Button } from '@/components/ui';
 
 const { width: W } = Dimensions.get('window');
-const OVAL_W = W * 0.65;
-const OVAL_H = OVAL_W * 1.25;
+const CAM_WIDTH = W - SPACING.md * 2;
+const CAM_HEIGHT = CAM_WIDTH * 1.3;
 
 type Step = 'intro' | 'scanning' | 'success' | 'failed';
 
 const INSTRUCTIONS = [
-  'Position your face in the oval',
-  'Look straight into the camera',
-  'Blink your eyes slowly',
+  'Please blink now',
   'Turn your head slightly left',
   'Turn your head slightly right',
   'Smile naturally',
@@ -28,23 +27,26 @@ const INSTRUCTIONS = [
 export default function LivenessScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [step, setStep] = useState<Step>('intro');
+  const [step, setStep] = useState<Step>('scanning'); // Start in scanning per the mockup right side
   const [instructionIndex, setInstructionIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const { setVerified } = useFinanceStore();
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.04, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+
+    if (step === 'scanning') {
+      startScan();
+    }
+  }, [step]);
 
   const startScan = async () => {
     if (!permission?.granted) {
@@ -54,8 +56,6 @@ export default function LivenessScreen() {
         return;
       }
     }
-    setStep('scanning');
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     runLivenessSimulation();
   };
 
@@ -66,11 +66,6 @@ export default function LivenessScreen() {
       setInstructionIndex(idx);
       const pct = (idx / INSTRUCTIONS.length) * 100;
       setProgress(pct);
-      Animated.timing(progressAnim, {
-        toValue: pct / 100,
-        duration: 600,
-        useNativeDriver: false,
-      }).start();
 
       if (idx >= INSTRUCTIONS.length) {
         clearInterval(interval);
@@ -85,7 +80,7 @@ export default function LivenessScreen() {
           }
         }, 800);
       }
-    }, 1100);
+    }, 1500);
   };
 
   const handleSuccess = () => {
@@ -93,276 +88,366 @@ export default function LivenessScreen() {
   };
 
   const handleRetry = () => {
-    setStep('intro');
+    setStep('scanning');
     setInstructionIndex(0);
     setProgress(0);
-    progressAnim.setValue(0);
   };
 
   return (
-    <View style={styles.container}>
-      {/* Background decoration */}
-      <View style={styles.bgCircle1} />
-      <View style={styles.bgCircle2} />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
+          <X size={20} color={COLORS.primaryDark} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>The Sovereign Ledger</Text>
+        <View style={styles.securePill}>
+          <Lock size={10} color={COLORS.accentDark} />
+          <Text style={styles.secureText}>SECURE LINK</Text>
+        </View>
+      </View>
 
-      {step === 'intro' && (
-        <Animated.View style={styles.content}>
-          <View style={styles.iconWrap}>
-            <ShieldCheck size={48} color={COLORS.primary} />
-          </View>
-          <Text style={styles.title}>Identity Verification</Text>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent} 
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Main Content */}
+        <View style={styles.content}>
+          <Text style={styles.sectionOverline}>SECURITY VERIFICATION</Text>
+          <Text style={styles.title}>Biometric Liveness Verification</Text>
           <Text style={styles.subtitle}>
-            To access your financial dashboard, we need to verify your identity using facial liveness detection.
+            Please position your face within the frame. We need to verify that your babe is not holding you ransom
           </Text>
 
-          <View style={styles.featureList}>
-            {[
-              { icon: Camera, text: 'Uses your front camera' },
-              { icon: Eye, text: 'Real-time liveness checks' },
-              { icon: ShieldCheck, text: 'Data never leaves your device' },
-            ].map(({ icon: Icon, text }, i) => (
-              <View key={i} style={styles.featureItem}>
-                <View style={styles.featureIcon}>
-                  <Icon size={16} color={COLORS.primary} />
-                </View>
-                <Text style={styles.featureText}>{text}</Text>
-              </View>
-            ))}
-          </View>
-
-          <Button label="Begin Verification" onPress={startScan} size="lg" style={styles.cta} />
-          <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.skipBtn}>
-            <Text style={styles.skipText}>Skip for now</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
-      {step === 'scanning' && (
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-          <Text style={styles.scanTitle}>Face Scan</Text>
-
-          {/* Camera oval */}
-          <View style={styles.ovalContainer}>
-            <Animated.View style={[styles.ovalBorder, { transform: [{ scale: pulseAnim }] }]}>
-              <View style={styles.ovalInner}>
+          {step === 'scanning' && (
+            <Animated.View style={[styles.scanContainer, { opacity: fadeAnim }]}>
+              {/* Camera View */}
+              <View style={styles.cameraWrapper}>
                 {permission?.granted ? (
-                  <CameraView
-                    style={styles.camera}
-                    facing="front"
-                  />
+                  <CameraView style={styles.camera} facing="front" />
                 ) : (
                   <View style={styles.cameraPlaceholder}>
                     <Camera size={40} color={COLORS.textMuted} />
                   </View>
                 )}
+
+                {/* Overlays */}
+                <View style={styles.overlayContainer}>
+                  <View style={styles.statusPills}>
+                    <View style={[styles.statusPill, { backgroundColor: 'rgba(0, 168, 132, 0.95)' }]}>
+                      <CheckCircle2 size={12} color="#fff" />
+                      <Text style={styles.statusText}>Lighting conditions optimal</Text>
+                    </View>
+                    <View style={[styles.statusPill, { backgroundColor: 'rgba(255, 180, 180, 0.95)' }]}>
+                      <AlertCircle size={12} color={COLORS.expense} />
+                      <Text style={[styles.statusText, { color: COLORS.expense }]}>Face partially obscured</Text>
+                    </View>
+                  </View>
+
+                  {/* Face Bounding Box simulation */}
+                  <Animated.View style={[styles.faceBox, { transform: [{ scale: pulseAnim }] }]} />
+
+                  {/* Instruction Float */}
+                  <View style={styles.instructionFloat}>
+                    <Eye size={16} color={COLORS.primary} />
+                    <Text style={styles.instructionFloatText}>
+                      {INSTRUCTIONS[Math.min(instructionIndex, INSTRUCTIONS.length - 1)]}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Steps List */}
+              <View style={styles.stepsList}>
+                <View style={styles.stepItem}>
+                  <View style={[styles.stepIcon, { backgroundColor: COLORS.accentDark }]}>
+                    <Check size={16} color="#fff" />
+                  </View>
+                  <View style={styles.stepTextContainer}>
+                    <Text style={styles.stepTitle}>Frame Detection</Text>
+                    <Text style={styles.stepSub}>Subject centered within operational parameters.</Text>
+                  </View>
+                </View>
+                <View style={styles.stepItem}>
+                  <View style={[styles.stepIcon, { backgroundColor: '#E0E7FF' }]}>
+                    <Loader size={16} color={COLORS.primaryLight} />
+                  </View>
+                  <View style={styles.stepTextContainer}>
+                    <Text style={styles.stepTitle}>Liveness Challenge</Text>
+                    <Text style={styles.stepSub}>Detecting active biometric movement...</Text>
+                  </View>
+                </View>
+                <View style={styles.stepItem}>
+                  <View style={[styles.stepIcon, { backgroundColor: '#E2E8F0' }]}>
+                    <Lock size={16} color={COLORS.textMuted} />
+                  </View>
+                  <View style={styles.stepTextContainer}>
+                    <Text style={[styles.stepTitle, { color: COLORS.textMuted }]}>Ledger Encryption</Text>
+                    <Text style={styles.stepSub}>Finalizing cryptographic verification link.</Text>
+                  </View>
+                </View>
               </View>
             </Animated.View>
+          )}
 
-            {/* Corner markers */}
-            {['tl', 'tr', 'bl', 'br'].map((pos) => (
-              <View key={pos} style={[styles.corner, styles[`corner_${pos}` as any]]} />
-            ))}
-          </View>
+          {step === 'success' && (
+            <View style={styles.resultContainer}>
+              <View style={[styles.resultIcon, { backgroundColor: COLORS.income + '20' }]}>
+                <CheckCircle2 size={60} color={COLORS.income} />
+              </View>
+              <Text style={styles.resultTitle}>Verified!</Text>
+              <Text style={styles.resultSub}>Your identity has been confirmed.</Text>
+              <Button label="Enter Dashboard" onPress={handleSuccess} size="lg" style={styles.btn} />
+            </View>
+          )}
 
-          {/* Instruction */}
-          <View style={styles.instructionBox}>
-            <Text style={styles.instructionText}>
-              {INSTRUCTIONS[Math.min(instructionIndex, INSTRUCTIONS.length - 1)]}
-            </Text>
-          </View>
-
-          {/* Progress bar */}
-          <View style={styles.progressTrack}>
-            <Animated.View
-              style={[
-                styles.progressFill,
-                {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                },
-              ]}
-            />
-          </View>
-          <Text style={styles.progressLabel}>{Math.round(progress)}% complete</Text>
-        </Animated.View>
-      )}
-
-      {step === 'success' && (
-        <View style={styles.content}>
-          <View style={[styles.resultIcon, { backgroundColor: COLORS.income + '20' }]}>
-            <CheckCircle2 size={60} color={COLORS.income} />
-          </View>
-          <Text style={styles.resultTitle}>Verified!</Text>
-          <Text style={styles.resultSub}>
-            Your identity has been confirmed. Welcome to SovereignLedger.
-          </Text>
-          <Button label="Enter Dashboard" onPress={handleSuccess} size="lg" style={styles.cta} />
+          {step === 'failed' && (
+            <View style={styles.resultContainer}>
+              <View style={[styles.resultIcon, { backgroundColor: COLORS.expense + '20' }]}>
+                <AlertCircle size={60} color={COLORS.expense} />
+              </View>
+              <Text style={styles.resultTitle}>Verification Failed</Text>
+              <Text style={styles.resultSub}>We couldn't confirm your liveness. Please try again.</Text>
+              <Button label="Try Again" onPress={handleRetry} size="lg" style={styles.btn} />
+              <Button label="Cancel Verification" onPress={() => router.back()} size="lg" variant="secondary" style={styles.btn} />
+            </View>
+          )}
         </View>
-      )}
 
-      {step === 'failed' && (
-        <View style={styles.content}>
-          <View style={[styles.resultIcon, { backgroundColor: COLORS.expense + '20' }]}>
-            <AlertCircle size={60} color={COLORS.expense} />
+        {/* Footer */}
+        {step === 'scanning' && (
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.troubleshootBtn} activeOpacity={0.8}>
+              <HelpCircle size={18} color="#fff" />
+              <Text style={styles.troubleshootBtnText}>Troubleshoot</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()} activeOpacity={0.8}>
+              <Text style={styles.cancelBtnText}>Cancel Verification</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.footerText}>PROTECTED BY SOVEREIGN LEDGER ENCRYPTION V4.2</Text>
           </View>
-          <Text style={styles.resultTitle}>Verification Failed</Text>
-          <Text style={styles.resultSub}>
-            We couldn't confirm your liveness. Please ensure good lighting and try again.
-          </Text>
-          <Button label="Try Again" onPress={handleRetry} size="lg" style={styles.cta} />
-          <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.skipBtn}>
-            <Text style={styles.skipText}>Continue without verification</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg0,
+    backgroundColor: '#F8FAFC', // very light grey matching the design
+  },
+  scrollContent: {
+    paddingBottom: SPACING.xl,
+  },
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
   },
-  bgCircle1: {
-    position: 'absolute', top: -80, right: -80,
-    width: 300, height: 300, borderRadius: 150,
-    backgroundColor: COLORS.primary + '0A',
+  headerBtn: {
+    padding: SPACING.sm,
   },
-  bgCircle2: {
-    position: 'absolute', bottom: -60, left: -60,
-    width: 200, height: 200, borderRadius: 100,
-    backgroundColor: COLORS.accent + '0A',
+  headerTitle: {
+    color: COLORS.primaryDark,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  securePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 212, 170, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.full,
+    gap: 4,
+  },
+  secureText: {
+    color: COLORS.accentDark,
+    fontSize: 10,
+    fontWeight: '800',
   },
   content: {
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    width: '100%',
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
   },
-  iconWrap: {
-    width: 96, height: 96,
-    borderRadius: 48,
-    backgroundColor: COLORS.primary + '18',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
+  sectionOverline: {
+    color: COLORS.primaryDark,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: SPACING.xs,
   },
   title: {
     color: COLORS.textPrimary,
     fontSize: 26,
     fontWeight: '800',
     marginBottom: SPACING.sm,
-    textAlign: 'center',
+    letterSpacing: -0.5,
   },
   subtitle: {
     color: COLORS.textSecondary,
     fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
     marginBottom: SPACING.xl,
   },
-  featureList: { width: '100%', marginBottom: SPACING.xl },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+  scanContainer: {
+    width: '100%',
   },
-  featureIcon: {
-    width: 36, height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.primary + '18',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  featureText: { color: COLORS.textSecondary, fontSize: 14 },
-  cta: { width: '100%', marginBottom: SPACING.md },
-  skipBtn: { paddingVertical: SPACING.sm },
-  skipText: { color: COLORS.textMuted, fontSize: 14 },
-
-  // Scanning
-  scanTitle: {
-    color: COLORS.textPrimary,
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: SPACING.xl,
-  },
-  ovalContainer: {
-    width: OVAL_W + 24,
-    height: OVAL_H + 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  cameraWrapper: {
+    width: '100%',
+    height: CAM_HEIGHT,
+    borderRadius: RADIUS.xl,
+    overflow: 'hidden',
     position: 'relative',
     marginBottom: SPACING.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 5,
   },
-  ovalBorder: {
-    width: OVAL_W,
-    height: OVAL_H,
-    borderRadius: OVAL_W / 2,
-    borderWidth: 2.5,
-    borderColor: COLORS.primary,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
+  camera: {
+    width: '100%',
+    height: '100%',
   },
-  ovalInner: { width: '100%', height: '100%', overflow: 'hidden', borderRadius: OVAL_W / 2 },
-  camera: { width: '100%', height: '100%' },
   cameraPlaceholder: {
     flex: 1,
     backgroundColor: COLORS.bg3,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  corner: {
-    position: 'absolute',
-    width: 24, height: 24,
-    borderColor: COLORS.accent,
-    borderWidth: 3,
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    padding: SPACING.lg,
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  corner_tl: { top: 0, left: 0, borderBottomWidth: 0, borderRightWidth: 0, borderTopLeftRadius: 6 },
-  corner_tr: { top: 0, right: 0, borderBottomWidth: 0, borderLeftWidth: 0, borderTopRightRadius: 6 },
-  corner_bl: { bottom: 0, left: 0, borderTopWidth: 0, borderRightWidth: 0, borderBottomLeftRadius: 6 },
-  corner_br: { bottom: 0, right: 0, borderTopWidth: 0, borderLeftWidth: 0, borderBottomRightRadius: 6 },
-  instructionBox: {
-    backgroundColor: COLORS.primary + '22',
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.primary + '44',
-  },
-  instructionText: {
-    color: COLORS.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  progressTrack: {
+  statusPills: {
     width: '100%',
-    height: 6,
-    backgroundColor: COLORS.bg3,
+    gap: SPACING.sm,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: RADIUS.full,
-    overflow: 'hidden',
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  faceBox: {
+    width: 220,
+    height: 140,
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+    borderRadius: RADIUS.md,
+    marginTop: 20,
+  },
+  instructionFloat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: 12,
+    borderRadius: RADIUS.full,
+    gap: SPACING.sm,
     marginBottom: SPACING.sm,
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.full,
+  instructionFloatText: {
+    color: COLORS.primaryDark,
+    fontSize: 15,
+    fontWeight: '800',
   },
-  progressLabel: { color: COLORS.textMuted, fontSize: 13 },
-
-  // Result
+  stepsList: {
+    gap: SPACING.md,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9', // light grey matching design
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    gap: SPACING.md,
+  },
+  stepIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepTextContainer: {
+    flex: 1,
+  },
+  stepTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  stepSub: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  footer: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.xl,
+    gap: SPACING.sm,
+  },
+  troubleshootBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primaryDark,
+    borderRadius: RADIUS.md,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  troubleshootBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  cancelBtn: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E0E7FF', // very light blue
+    borderRadius: RADIUS.md,
+    paddingVertical: 16,
+  },
+  cancelBtnText: {
+    color: COLORS.primaryDark,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  btn: {
+    width: '100%',
+  },
+  footerText: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    textAlign: 'center',
+    marginTop: SPACING.md,
+    letterSpacing: 0.8,
+  },
+  resultContainer: {
+    height: 400,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   resultIcon: {
     width: 110, height: 110,
     borderRadius: 55,
@@ -383,4 +468,4 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: SPACING.xl,
   },
-} as any);
+});

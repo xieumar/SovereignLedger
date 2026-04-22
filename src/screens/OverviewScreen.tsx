@@ -1,47 +1,29 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Settings } from 'lucide-react-native';
+import { Bell, Settings, User, ScanLine, Edit, CreditCard, Wallet, MoreHorizontal, ShoppingBag, Banknote, Utensils } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFinanceStore } from '@/store';
 import { EmptyState, Card, SectionHeader} from '@/components/ui';
 import { BalanceCard } from '@/components/BalanceCard';
 import { AllocationRow } from '@/components/AllocationRow';
 import { SplineChart } from '@/components/SplineChart';
-import { TransactionItem } from '@/components/TransactionItem';
-import { COLORS, SPACING, CATEGORY_META } from '@/constants';
-import {
-  calcBalance, calcTotalIncome, calcTotalExpenses,
-  spendingLast6Months, incomeLast6Months, last6MonthLabels,
-  spendingByCategory,
-} from '@/utils';
+import { COLORS, SPACING, RADIUS } from '@/constants';
 
 export default function OverviewScreen() {
   const router = useRouter();
-  const { transactions, settings, refresh, isLoading } = useFinanceStore();
+  const { settings, refresh, isLoading } = useFinanceStore();
 
-  const balance = useMemo(() => calcBalance(transactions), [transactions]);
-  const income = useMemo(() => calcTotalIncome(transactions), [transactions]);
-  const expenses = useMemo(() => calcTotalExpenses(transactions), [transactions]);
-  const spendData = useMemo(() => spendingLast6Months(transactions), [transactions]);
-  const incomeData = useMemo(() => incomeLast6Months(transactions), [transactions]);
-  const monthLabels = useMemo(() => last6MonthLabels(), []);
+  const spendData = [120, 200, 150, 300];
+  const monthLabels = ['W1', 'W2', 'W3', 'W4'];
 
-  const recentTxs = useMemo(() => transactions.slice(0, 5), [transactions]);
-
-  const allocations = useMemo(() => {
-    const byCategory = spendingByCategory(transactions);
-    return Object.entries(byCategory)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([category, amount]) => ({
-        category: category as any,
-        amount,
-        change: Math.round((Math.random() * 40) - 20), // demo indicator
-      }));
-  }, [transactions]);
+  const savings = [
+    { label: 'INVESTMENTS', percent: 65, color: COLORS.primary },
+    { label: 'CASH SAVINGS', percent: 25, color: COLORS.primaryLight },
+    { label: 'CRYPTO VAULT', percent: 10, color: COLORS.accent },
+  ];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -53,67 +35,87 @@ export default function OverviewScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.appName}>SovereignLedger</Text>
-            <Text style={styles.greeting}>Your wealth overview</Text>
+          <View style={styles.headerLeft}>
+            <View style={styles.avatar}>
+              <User size={18} color={COLORS.textSecondary} />
+            </View>
+            <Text style={styles.appName}>Sovereign Ledger</Text>
           </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notifications' as any)}>
-              <Bell size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/(tabs)/settings')}>
-              <Settings size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notifications' as any)}>
+            <Bell size={20} color={COLORS.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         {/* Balance Card */}
         <BalanceCard
-          balance={balance}
-          income={income}
-          expenses={expenses}
+          balance={42950.40}
+          income={0}
+          expenses={0}
           currency={settings.currency}
-          onDeposit={() => router.push({ pathname: '/(tabs)/transactions', params: { type: 'income' } })}
-          onWithdraw={() => router.push({ pathname: '/(tabs)/transactions', params: { type: 'expense' } })}
+          onDeposit={() => {}}
+          onWithdraw={() => {}}
           style={styles.balanceCard}
         />
 
+        {/* Quick Actions */}
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.quickActionBtn}>
+            <ScanLine size={20} color={COLORS.primaryLight} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionBtn}>
+            <Edit size={20} color={COLORS.primaryLight} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionBtn}>
+            <CreditCard size={20} color={COLORS.accentDark} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionBtn}>
+            <Wallet size={20} color={COLORS.accentDark} />
+          </TouchableOpacity>
+        </View>
+
         {/* Allocations */}
-        {allocations.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader
-              title="Allocations"
-              actionLabel="View All"
-              onAction={() => router.push('/(tabs)/analytics')}
-            />
-            <AllocationRow allocations={allocations} currency={settings.currency} />
-          </View>
-        )}
+        <View style={styles.section}>
+          <SectionHeader
+            title="Allocations"
+            actionLabel="View All"
+            onAction={() => {}}
+          />
+          <AllocationRow />
+        </View>
 
         {/* Spending Trend */}
         <Card style={styles.section}>
-          <SectionHeader
-            title="Spending Trend"
-            actionLabel="Details"
-            onAction={() => router.push('/(tabs)/analytics')}
-          />
+          <View style={styles.trendHeader}>
+            <View>
+              <Text style={styles.trendTitle}>Spending Trend</Text>
+              <Text style={styles.trendSub}>OCT 1 - OCT 15, 2023</Text>
+            </View>
+            <MoreHorizontal size={20} color={COLORS.primary} />
+          </View>
           <SplineChart
             data={spendData}
             labels={monthLabels}
-            color={COLORS.chart1}
-            secondData={incomeData}
-            secondColor={COLORS.income}
+            color={COLORS.primary}
           />
-          <View style={styles.chartLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.chart1 }]} />
-              <Text style={styles.legendLabel}>Spending</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.income, borderStyle: 'dashed', borderWidth: 1 }]} />
-              <Text style={styles.legendLabel}>Income</Text>
-            </View>
+        </Card>
+
+        {/* Savings */}
+        <Card style={[styles.section, styles.savingsCard]}>
+          <View style={styles.savingsHeader}>
+            <Text style={styles.savingsTitle}>Savings</Text>
+            <Settings size={16} color={COLORS.primary} />
           </View>
+          {savings.map((s, i) => (
+            <View key={i} style={styles.savingRow}>
+              <View style={styles.savingRowHeader}>
+                <Text style={styles.savingLabel}>{s.label}</Text>
+                <Text style={styles.savingLabel}>{s.percent}%</Text>
+              </View>
+              <View style={styles.savingTrack}>
+                <View style={[styles.savingFill, { width: `${s.percent}%`, backgroundColor: s.color }]} />
+              </View>
+            </View>
+          ))}
         </Card>
 
         {/* Recent Ledger */}
@@ -121,19 +123,47 @@ export default function OverviewScreen() {
           <SectionHeader
             title="Recent Ledger"
             actionLabel="VIEW ALL"
-            onAction={() => router.push('/(tabs)/transactions')}
+            onAction={() => {}}
           />
-          {recentTxs.length === 0
-            ? <EmptyState message="No transactions yet" subtext="Tap + to add your first entry" />
-            : recentTxs.map(tx => (
-                <TransactionItem
-                  key={tx.id}
-                  transaction={tx}
-                  currency={settings.currency}
-                  onDelete={(id) => useFinanceStore.getState().removeTransaction(id)}
-                />
-              ))
-          }
+          <Card style={styles.txItem}>
+            <View style={styles.txIconWrap}>
+              <ShoppingBag size={16} color={COLORS.primary} />
+            </View>
+            <View style={styles.txBody}>
+              <Text style={styles.txTitle}>Apple Store</Text>
+              <Text style={styles.txSub}>TECHNOLOGY • 2:45 PM</Text>
+            </View>
+            <View style={styles.txRight}>
+              <Text style={[styles.txAmount, { color: COLORS.expense }]}>-$1,299.00</Text>
+              <Text style={styles.txDate}>OCT 12</Text>
+            </View>
+          </Card>
+          <Card style={styles.txItem}>
+            <View style={[styles.txIconWrap, { backgroundColor: COLORS.income + '20' }]}>
+              <Banknote size={16} color={COLORS.income} />
+            </View>
+            <View style={styles.txBody}>
+              <Text style={styles.txTitle}>Dividend Payout</Text>
+              <Text style={styles.txSub}>INVESTMENT • 11:30 AM</Text>
+            </View>
+            <View style={styles.txRight}>
+              <Text style={[styles.txAmount, { color: COLORS.income }]}>+$450.25</Text>
+              <Text style={styles.txDate}>OCT 11</Text>
+            </View>
+          </Card>
+          <Card style={styles.txItem}>
+            <View style={styles.txIconWrap}>
+              <Utensils size={16} color={COLORS.primary} />
+            </View>
+            <View style={styles.txBody}>
+              <Text style={styles.txTitle}>The Gilded Fork</Text>
+              <Text style={styles.txSub}>DINING • 8:15 PM</Text>
+            </View>
+            <View style={styles.txRight}>
+              <Text style={[styles.txAmount, { color: COLORS.expense }]}>-$240.50</Text>
+              <Text style={styles.txDate}>OCT 10</Text>
+            </View>
+          </Card>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -150,24 +180,110 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm,
+    paddingBottom: SPACING.md,
   },
-  appName: { color: COLORS.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
-  greeting: { color: COLORS.textMuted, fontSize: 12 },
-  headerRight: { flexDirection: 'row', gap: SPACING.sm },
-  iconBtn: {
-    width: 38, height: 38,
-    borderRadius: 19,
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  avatar: {
+    width: 32, height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.bg3,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  balanceCard: { marginHorizontal: SPACING.md, marginBottom: SPACING.lg },
+  appName: { color: COLORS.primaryDark, fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
+  iconBtn: {
+    width: 40, height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  balanceCard: { marginHorizontal: SPACING.md, marginBottom: SPACING.md },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.xl,
+  },
+  quickActionBtn: {
+    width: 54, height: 54,
+    borderRadius: 16,
+    backgroundColor: COLORS.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   section: { marginHorizontal: SPACING.md, marginBottom: SPACING.lg },
-  chartLegend: { flexDirection: 'row', gap: SPACING.lg, marginTop: SPACING.sm },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendLabel: { color: COLORS.textSecondary, fontSize: 12 },
+  trendHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.lg,
+  },
+  trendTitle: { color: COLORS.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  trendSub: { color: COLORS.textMuted, fontSize: 10, fontWeight: '600', letterSpacing: 0.5 },
+  savingsCard: {
+    paddingVertical: SPACING.lg,
+    gap: SPACING.md,
+  },
+  savingsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  savingsTitle: { color: COLORS.textPrimary, fontSize: 15, fontWeight: '700' },
+  savingRow: { width: '100%' },
+  savingRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  savingLabel: { color: COLORS.textPrimary, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  savingTrack: {
+    width: '100%',
+    height: 6,
+    backgroundColor: COLORS.bg3,
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+  },
+  savingFill: {
+    height: '100%',
+    borderRadius: RADIUS.full,
+  },
+  txItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    shadowColor: 'transparent',
+    elevation: 0,
+  },
+  txIconWrap: {
+    width: 40, height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.bg3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  txBody: { flex: 1 },
+  txTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  txSub: { color: COLORS.textMuted, fontSize: 10, fontWeight: '600', letterSpacing: 0.5 },
+  txRight: { alignItems: 'flex-end' },
+  txAmount: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  txDate: { color: COLORS.textMuted, fontSize: 10, fontWeight: '600' },
 });

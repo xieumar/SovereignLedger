@@ -1,56 +1,31 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import {
-  Utensils, Car, Briefcase, ShoppingBag, Film, Heart,
-  Zap, Home, PiggyBank, TrendingUp, Bitcoin, MoreHorizontal,
-} from 'lucide-react-native';
-import { COLORS, SPACING, RADIUS, CATEGORY_META } from '@/constants';
-import { formatCurrency } from '@/utils';
-import type { TransactionCategory, CurrencyCode } from '@/types';
+import { Car, Utensils, ShoppingCart } from 'lucide-react-native';
+import { COLORS, SPACING, RADIUS } from '@/constants';
 
-const ICON_MAP: Record<string, any> = {
-  utensils: Utensils, car: Car, briefcase: Briefcase,
-  'shopping-bag': ShoppingBag, film: Film, heart: Heart,
-  zap: Zap, home: Home, 'piggy-bank': PiggyBank,
-  'trending-up': TrendingUp, bitcoin: Bitcoin,
-  'more-horizontal': MoreHorizontal,
-};
-
-interface Allocation {
-  category: TransactionCategory;
-  amount: number;
-  change?: number; // percentage
-}
-
-interface Props {
-  allocations: Allocation[];
-  currency: CurrencyCode;
-}
-
-export const AllocationRow = ({ allocations, currency }: Props) => {
-  if (allocations.length === 0) return null;
+export const AllocationRow = () => {
+  const allocations = [
+    { id: 1, icon: Car, label: 'Transport', spent: '$320', left: '$300 LEFT', progress: 0.5, color: COLORS.primary },
+    { id: 2, icon: Utensils, label: 'Dining Out', spent: '$485', left: '$15 LEFT', progress: 0.95, color: COLORS.expense },
+    { id: 3, icon: ShoppingCart, label: 'Groceries', spent: '$250', left: '$50 LEFT', progress: 0.8, color: COLORS.primaryDark },
+  ];
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
-      {allocations.map((a, i) => {
-        const meta = CATEGORY_META[a.category];
-        const IconComp = ICON_MAP[meta.icon] ?? MoreHorizontal;
-        const isPositive = (a.change ?? 0) >= 0;
-
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.content}>
+      {allocations.map((a) => {
+        const Icon = a.icon;
         return (
-          <View key={i} style={styles.tile}>
-            <View style={[styles.iconWrap, { backgroundColor: meta.color + '20' }]}>
-              <IconComp size={16} color={meta.color} />
+          <View key={a.id} style={styles.tile}>
+            <View style={styles.iconWrap}>
+              <Icon size={14} color={COLORS.primaryLight} />
             </View>
-            <Text style={styles.categoryLabel} numberOfLines={1}>{meta.label}</Text>
-            <Text style={styles.amount}>{formatCurrency(a.amount, currency)}</Text>
-            {a.change !== undefined && (
-              <View style={[styles.changePill, { backgroundColor: (isPositive ? COLORS.expense : COLORS.income) + '22' }]}>
-                <Text style={[styles.changeText, { color: isPositive ? COLORS.expense : COLORS.income }]}>
-                  {isPositive ? '+' : ''}{a.change.toFixed(0)}%
-                </Text>
-              </View>
-            )}
+            <Text style={styles.categoryLabel}>{a.label}</Text>
+            <Text style={styles.amount}>{a.spent}</Text>
+            
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${a.progress * 100}%`, backgroundColor: a.color }]} />
+            </View>
+            <Text style={[styles.leftText, { color: a.color === COLORS.expense ? COLORS.expense : COLORS.textMuted }]}>{a.left}</Text>
           </View>
         );
       })}
@@ -60,40 +35,51 @@ export const AllocationRow = ({ allocations, currency }: Props) => {
 
 const styles = StyleSheet.create({
   scroll: { marginHorizontal: -SPACING.md },
+  content: { paddingHorizontal: SPACING.md, gap: SPACING.md },
   tile: {
     backgroundColor: COLORS.card,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     borderRadius: RADIUS.lg,
-    padding: SPACING.sm + 4,
-    marginLeft: SPACING.md,
-    minWidth: 100,
-    maxWidth: 110,
+    padding: SPACING.md,
+    minWidth: 120,
   },
   iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: RADIUS.sm,
+    width: 24,
+    height: 24,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primaryLight + '20',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: SPACING.sm,
   },
   categoryLabel: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    marginBottom: 4,
+    color: COLORS.textPrimary,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   amount: {
-    color: COLORS.textPrimary,
-    fontSize: 13,
-    fontWeight: '700',
+    color: COLORS.primaryDark,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: SPACING.md,
   },
-  changePill: {
-    marginTop: 4,
+  progressTrack: {
+    width: '100%',
+    height: 4,
+    backgroundColor: COLORS.bg3,
     borderRadius: RADIUS.full,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    alignSelf: 'flex-start',
+    marginBottom: 4,
+    overflow: 'hidden',
   },
-  changeText: { fontSize: 10, fontWeight: '700' },
+  progressFill: {
+    height: '100%',
+    borderRadius: RADIUS.full,
+  },
+  leftText: {
+    fontSize: 8,
+    fontWeight: '800',
+    marginTop: 2,
+  },
 });
