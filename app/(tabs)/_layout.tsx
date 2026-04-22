@@ -1,27 +1,29 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   LayoutDashboard, ArrowLeftRight, BarChart3, Target, Settings,
 } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 
 const TAB_ICONS: Record<string, any> = {
-  index:           LayoutDashboard,
-  transactions:    ArrowLeftRight,
-  analytics:       BarChart3,
-  budgets:         Target,
-  settings:        Settings,
+  index:          LayoutDashboard,
+  transactions:   ArrowLeftRight,
+  analytics:      BarChart3,
+  budgets:        Target,
+  settings:       Settings,
 };
 
 const TAB_LABELS: Record<string, string> = {
-  index:           'Overview',
-  transactions:    'Ledger',
-  analytics:       'Analytics',
-  budgets:         'Budgets',
-  settings:        'Settings',
+  index:          'Overview',
+  transactions:   'Ledger',
+  analytics:      'Analytics',
+  budgets:        'Budgets',
+  settings:       'Settings',
 };
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={({ route }) => {
@@ -29,7 +31,13 @@ export default function TabsLayout() {
         const label = TAB_LABELS[route.name] ?? route.name;
         return {
           headerShown: false,
-          tabBarStyle: styles.tabBar,
+          tabBarStyle: [
+            styles.tabBar,
+            {
+              height: 60 + insets.bottom,
+              paddingBottom: 8 + insets.bottom,
+            }
+          ],
           tabBarShowLabel: true,
           tabBarActiveTintColor: COLORS.primary,
           tabBarInactiveTintColor: COLORS.textMuted,
@@ -74,8 +82,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg1,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
-    height: 72,
-    paddingBottom: 8,
     paddingTop: 8,
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
