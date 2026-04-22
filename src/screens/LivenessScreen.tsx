@@ -27,7 +27,7 @@ const INSTRUCTIONS = [
 export default function LivenessScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [step, setStep] = useState<Step>('scanning'); // Start in scanning per the mockup right side
+  const [step, setStep] = useState<Step>('scanning'); 
   const [instructionIndex, setInstructionIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const { setVerified } = useFinanceStore();
@@ -70,7 +70,7 @@ export default function LivenessScreen() {
       if (idx >= INSTRUCTIONS.length) {
         clearInterval(interval);
         setTimeout(() => {
-          const success = Math.random() > 0.15; // 85% success rate for demo
+          const success = Math.random() > 0.15; 
           if (success) {
             setStep('success');
             const expiry = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -95,7 +95,6 @@ export default function LivenessScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
           <X size={20} color={COLORS.primaryDark} />
@@ -108,10 +107,11 @@ export default function LivenessScreen() {
       </View>
 
       <ScrollView 
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent} 
         showsVerticalScrollIndicator={false}
+        bounces={true}
       >
-        {/* Main Content */}
         <View style={styles.content}>
           <Text style={styles.sectionOverline}>SECURITY VERIFICATION</Text>
           <Text style={styles.title}>Biometric Liveness Verification</Text>
@@ -121,7 +121,6 @@ export default function LivenessScreen() {
 
           {step === 'scanning' && (
             <Animated.View style={[styles.scanContainer, { opacity: fadeAnim }]}>
-              {/* Camera View */}
               <View style={styles.cameraWrapper}>
                 {permission?.granted ? (
                   <CameraView style={styles.camera} facing="front" />
@@ -131,7 +130,6 @@ export default function LivenessScreen() {
                   </View>
                 )}
 
-                {/* Overlays */}
                 <View style={styles.overlayContainer}>
                   <View style={styles.statusPills}>
                     <View style={[styles.statusPill, { backgroundColor: 'rgba(0, 168, 132, 0.95)' }]}>
@@ -143,11 +141,7 @@ export default function LivenessScreen() {
                       <Text style={[styles.statusText, { color: COLORS.expense }]}>Face partially obscured</Text>
                     </View>
                   </View>
-
-                  {/* Face Bounding Box simulation */}
                   <Animated.View style={[styles.faceBox, { transform: [{ scale: pulseAnim }] }]} />
-
-                  {/* Instruction Float */}
                   <View style={styles.instructionFloat}>
                     <Eye size={16} color={COLORS.primary} />
                     <Text style={styles.instructionFloatText}>
@@ -157,7 +151,6 @@ export default function LivenessScreen() {
                 </View>
               </View>
 
-              {/* Steps List */}
               <View style={styles.stepsList}>
                 <View style={styles.stepItem}>
                   <View style={[styles.stepIcon, { backgroundColor: COLORS.accentDark }]}>
@@ -213,8 +206,6 @@ export default function LivenessScreen() {
             </View>
           )}
         </View>
-
-        {/* Footer */}
         {step === 'scanning' && (
           <View style={styles.footer}>
             <TouchableOpacity style={styles.troubleshootBtn} activeOpacity={0.8}>
@@ -237,10 +228,14 @@ export default function LivenessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC', // very light grey matching the design
+    backgroundColor: '#F8FAFC',
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
-    paddingBottom: SPACING.xl,
+    flexGrow: 1, 
+    paddingBottom: SPACING.xl * 2, 
   },
   header: {
     flexDirection: 'row',
@@ -248,6 +243,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
+    backgroundColor: '#F8FAFC', 
   },
   headerBtn: {
     padding: SPACING.sm,
@@ -272,6 +268,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   content: {
+    flex: 1, 
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
   },
@@ -326,6 +323,7 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 10, 
   },
   statusPills: {
     width: '100%',
@@ -374,7 +372,7 @@ const styles = StyleSheet.create({
   stepItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9', // light grey matching design
+    backgroundColor: '#F1F5F9',
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     gap: SPACING.md,
@@ -403,6 +401,7 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.xl,
+    marginTop: 'auto', 
     gap: SPACING.sm,
   },
   troubleshootBtn: {
@@ -424,7 +423,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E0E7FF', // very light blue
+    backgroundColor: '#E0E7FF',
     borderRadius: RADIUS.md,
     paddingVertical: 16,
   },
@@ -435,6 +434,7 @@ const styles = StyleSheet.create({
   },
   btn: {
     width: '100%',
+    marginTop: SPACING.sm,
   },
   footerText: {
     color: COLORS.textMuted,
@@ -444,9 +444,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   resultContainer: {
-    height: 400,
+    flex: 1,
+    minHeight: 400, 
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: SPACING.xl,
   },
   resultIcon: {
     width: 110, height: 110,
