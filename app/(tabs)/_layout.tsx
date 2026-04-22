@@ -73,6 +73,8 @@ export default function TabsLayout() {
       />
       <Tabs.Screen name="analytics" />
       <Tabs.Screen name="budgets" />
+      <Tabs.Screen name="allocations" options={{ href: null }} />
+      <Tabs.Screen name="monthly-burn" options={{ href: null }} />
     </Tabs>
   );
 }

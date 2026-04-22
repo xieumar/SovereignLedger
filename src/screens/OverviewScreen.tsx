@@ -78,7 +78,7 @@ export default function OverviewScreen() {
           <SectionHeader
             title="Allocations"
             actionLabel="View All"
-            onAction={() => {}}
+            onAction={() => router.push('/(tabs)/allocations')}
           />
           <AllocationRow />
         </View>
