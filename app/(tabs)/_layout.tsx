@@ -1,59 +1,112 @@
-import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Tabs } from 'expo-router';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import {
+  LayoutDashboard, ArrowLeftRight, BarChart3, Target, Settings,
+} from 'lucide-react-native';
+import { COLORS, SPACING, RADIUS } from '@/constants';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+const TAB_ICONS: Record<string, any> = {
+  index:           LayoutDashboard,
+  transactions:    ArrowLeftRight,
+  analytics:       BarChart3,
+  budgets:         Target,
+  settings:        Settings,
+};
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
+const TAB_LABELS: Record<string, string> = {
+  index:           'Overview',
+  transactions:    'Ledger',
+  analytics:       'Analytics',
+  budgets:         'Budgets',
+  settings:        'Settings',
+};
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+export default function TabsLayout() {
   return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+      screenOptions={({ route }) => {
+        const Icon = TAB_ICONS[route.name] ?? LayoutDashboard;
+        const label = TAB_LABELS[route.name] ?? route.name;
+        return {
+          headerShown: false,
+          tabBarStyle: styles.tabBar,
+          tabBarShowLabel: true,
+          tabBarActiveTintColor: COLORS.primary,
+          tabBarInactiveTintColor: COLORS.textMuted,
+          tabBarLabelStyle: styles.tabLabel,
+          tabBarItemStyle: styles.tabItem,
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <Icon size={20} color={color} />
+            </View>
           ),
-        }}
-      />
+          tabBarLabel: label,
+        };
+      }}
+    >
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="transactions" />
       <Tabs.Screen
-        name="two"
+        name="add-transaction"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          tabBarButton: (props) => (
+            <TouchableOpacity
+              {...(props as any)}
+              style={styles.fabWrap}
+              activeOpacity={0.85}
+            >
+              <View style={styles.fab}>
+                <Text style={styles.fabPlus}>+</Text>
+              </View>
+            </TouchableOpacity>
+          ),
+          tabBarLabel: () => null,
         }}
       />
+      <Tabs.Screen name="analytics" />
+      <Tabs.Screen name="budgets" />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: COLORS.bg1,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
+    height: 72,
+    paddingBottom: 8,
+    paddingTop: 8,
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
+  tabItem:  { paddingTop: 4 },
+  tabLabel: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+  iconWrap: {
+    width: 36, height: 28,
+    alignItems: 'center', justifyContent: 'center',
+    borderRadius: RADIUS.sm,
+  },
+  iconWrapActive: { backgroundColor: COLORS.primary + '18' },
+  fabWrap: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    marginTop: -20,
+  },
+  fab: {
+    width: 52, height: 52,
+    borderRadius: 26,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  fabPlus: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },
+});
