@@ -17,7 +17,7 @@ const TAB_ICONS: Record<string, any> = {
 const TAB_LABELS: Record<string, string> = {
   index:          'Overview',
   transactions:   'Ledger',
-  analytics:      'Analytics',
+  analytics:      'Insights',
   budgets:        'Budgets',
   settings:       'Settings',
 };
