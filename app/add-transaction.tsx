@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Dimensions, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Dimensions, KeyboardAvoidingView, Platform, Switch, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Camera, Upload, CheckCircle2, User, AlignLeft, Calendar } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +7,6 @@ import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Button, Card } from '@/components/ui';
 import { useFinanceStore } from '@/store';
 import { TransactionCategory } from '@/types';
-
 import { useToastStore } from '@/store/toast';
 
 const { width: W } = Dimensions.get('window');
@@ -16,7 +15,7 @@ type Tab = 'Manual' | 'Capture' | 'UploadData';
 
 export default function AddTransactionScreen() {
   const router = useRouter();
-  const { addTransaction } = useFinanceStore();
+  const { addTransaction, budgets } = useFinanceStore();
   const toast = useToastStore();
   const [tab, setTab] = useState<Tab>('Manual');
   const [amount, setAmount] = useState('0.00');
@@ -24,6 +23,7 @@ export default function AddTransactionScreen() {
   const [category, setCategory] = useState<TransactionCategory>('food');
   const [description, setDescription] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   const handleSave = async () => {
     const numAmount = parseFloat(amount);
@@ -65,6 +65,23 @@ export default function AddTransactionScreen() {
       return prev + val;
     });
   };
+
+  const defaultCats = [
+    { id: 'food', name: 'Food' },
+    { id: 'transport', name: 'Travel' },
+    { id: 'shopping', name: 'Shopping' },
+    { id: 'salary', name: 'Salary' },
+    { id: 'rent', name: 'Rent' },
+    { id: 'other', name: 'Other' },
+  ];
+
+  // Merge defaults with custom budgets, deduplicate by name
+  const allCategories = [...defaultCats];
+  budgets.forEach(b => {
+    if (!allCategories.find(c => c.name.toLowerCase() === (b.name || b.category).toLowerCase())) {
+      allCategories.push({ id: b.category, name: b.name || b.category });
+    }
+  });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -110,7 +127,7 @@ export default function AddTransactionScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Form Fields */}
+            {/* Category Selector */}
             <Card style={styles.formCard}>
               <View style={styles.inputRow}>
                 <Text style={styles.label}>DESCRIPTION</Text>
@@ -128,19 +145,43 @@ export default function AddTransactionScreen() {
               
               <View style={[styles.inputRow, { borderBottomWidth: 0, marginBottom: 0 }]}>
                 <Text style={styles.label}>CATEGORY</Text>
-                <View style={styles.inputWrap}>
-                  <Text style={styles.inputPlaceholder}>{category.toUpperCase()}</Text>
-                  <TouchableOpacity onPress={() => {
-                    // Simple toggle for demo or show a picker
-                    const cats: TransactionCategory[] = ['food', 'transport', 'shopping', 'salary', 'rent', 'other'];
-                    const next = cats[(cats.indexOf(category) + 1) % cats.length];
-                    setCategory(next);
-                  }}>
-                    <ChevronLeft size={18} color={COLORS.textMuted} style={{ transform: [{ rotate: '-90deg' }] }} />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity 
+                  style={styles.inputWrap} 
+                  onPress={() => setShowCategoryDropdown(true)}
+                >
+                  <Text style={styles.inputPlaceholder}>
+                    {allCategories.find(c => c.id === category)?.name || category.toUpperCase()}
+                  </Text>
+                  <ChevronLeft size={18} color={COLORS.textMuted} style={{ transform: [{ rotate: '-90deg' }] }} />
+                </TouchableOpacity>
               </View>
             </Card>
+
+            {/* Category Dropdown Modal */}
+            <Modal visible={showCategoryDropdown} transparent animationType="fade">
+              <View style={styles.dropdownOverlay}>
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowCategoryDropdown(false)} />
+                <View style={styles.dropdownCard}>
+                  <ScrollView style={styles.dropdownScroll}>
+                    {allCategories.map((c, idx) => (
+                      <TouchableOpacity 
+                        key={`${c.id}-${idx}`} 
+                        style={[styles.dropdownItem, category === c.id && styles.dropdownItemActive]}
+                        onPress={() => {
+                          setCategory(c.id as any);
+                          setShowCategoryDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, category === c.id && styles.dropdownItemTextActive]}>
+                          {c.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowCategoryDropdown(false)} />
+              </View>
+            </Modal>
 
             <Card style={styles.recurringCard}>
               <View style={styles.recurringRow}>
@@ -332,4 +373,12 @@ const styles = StyleSheet.create({
   },
   placeholderTitle: { fontSize: 17, fontWeight: '800', color: COLORS.textPrimary, marginTop: 20, marginBottom: 8 },
   placeholderSub: { fontSize: 14, color: COLORS.textMuted, fontWeight: '600' },
+
+  dropdownOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 20 },
+  dropdownCard: { backgroundColor: '#fff', borderRadius: RADIUS.xl, maxHeight: 400, overflow: 'hidden', padding: 10 },
+  dropdownScroll: { paddingVertical: 5 },
+  dropdownItem: { padding: 16, backgroundColor: '#F8FAFC', borderRadius: RADIUS.lg, marginBottom: 8 },
+  dropdownItemActive: { backgroundColor: COLORS.primary + '10', borderColor: COLORS.primary, borderWidth: 1 },
+  dropdownItemText: { fontSize: 15, fontWeight: '600', color: COLORS.textPrimary },
+  dropdownItemTextActive: { color: COLORS.primary },
 });

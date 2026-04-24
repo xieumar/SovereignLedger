@@ -2,23 +2,18 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, ShoppingBag, Banknote, Utensils, Smartphone, Zap, CreditCard } from 'lucide-react-native';
+import { ChevronLeft, ShoppingBag, Banknote, CreditCard } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Button } from '@/components/ui';
+import { useFinanceStore } from '@/store';
 
 export default function TransactionsScreen() {
   const router = useRouter();
+  const { transactions } = useFinanceStore();
 
-  const ledgers = [
-    { id: 1, title: 'Apple Store', sub: 'TECHNOLOGY • 2:45 PM', amount: '-$1,299.00', date: 'OCT 12', type: 'expense', icon: Smartphone, iconColor: COLORS.primaryDark },
-    { id: 2, title: 'Design Payment', sub: 'PAYMENT • 1:30 PM', amount: '+$1,299.00', date: 'OCT 11', type: 'income', icon: Banknote, iconColor: '#00D4AA' },
-    { id: 3, title: 'Netflix', sub: 'SUBSCRIPTION • 2:45 PM', amount: '-$1,299.00', date: 'OCT 12', type: 'expense', icon: Utensils, iconColor: COLORS.primary },
-    { id: 4, title: 'Slack', sub: 'COMMUNICATION • 10:00 PM', amount: '-$8.00', date: 'OCT 11', type: 'expense', icon: ShoppingBag, iconColor: COLORS.primaryDark },
-    { id: 5, title: 'Dropbox', sub: 'CLOUD STORAGE • 11:30 PM', amount: '-$15.00', date: 'OCT 13', type: 'expense', icon: Banknote, iconColor: '#00D4AA' },
-    { id: 6, title: 'Trello', sub: 'PROJECT MANAGEMENT • 12:00 AM', amount: '-$9.99', date: 'OCT 14', type: 'expense', icon: Utensils, iconColor: COLORS.primaryDark },
-    { id: 7, title: 'Google Workspace', sub: 'SUBSCRIPTION • 6:15 AM', amount: '-$12.00', date: 'OCT 11', type: 'expense', icon: Banknote, iconColor: '#00D4AA' },
-    { id: 8, title: 'Microsoft Office 365', sub: 'SUBSCRIPTION • 7:10 PM', amount: '-$99.99', date: 'OCT 10', type: 'expense', icon: Utensils, iconColor: COLORS.primary },
-  ];
+  const sortedTransactions = [...transactions].sort((a, b) => 
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -32,25 +27,37 @@ export default function TransactionsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {ledgers.map((item) => (
-          <View key={item.id} style={styles.txCard}>
+        {sortedTransactions.length > 0 ? sortedTransactions.map((tx) => (
+          <View key={tx.id} style={styles.txCard}>
             <View style={styles.iconContainer}>
-              <item.icon size={20} color={item.iconColor} />
+              {tx.type === 'income' ? (
+                <Banknote size={20} color="#00D4AA" />
+              ) : (
+                <ShoppingBag size={20} color={COLORS.primary} />
+              )}
             </View>
             
             <View style={styles.txBody}>
-              <Text style={styles.txTitle}>{item.title}</Text>
-              <Text style={styles.txSub}>{item.sub}</Text>
+              <Text style={styles.txTitle}>{tx.description}</Text>
+              <Text style={styles.txSub}>
+                {tx.category.toUpperCase()} • {new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
             </View>
             
             <View style={styles.txRight}>
-              <Text style={[styles.txAmount, { color: item.type === 'income' ? '#00D4AA' : '#FF4757' }]}>
-                {item.amount}
+              <Text style={[styles.txAmount, { color: tx.type === 'income' ? '#00D4AA' : '#FF4757' }]}>
+                {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString()}
               </Text>
-              <Text style={styles.txDate}>{item.date}</Text>
+              <Text style={styles.txDate}>
+                {new Date(tx.date).toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()}
+              </Text>
             </View>
           </View>
-        ))}
+        )) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No records found yet.</Text>
+          </View>
+        )}
 
         {/* New Entry Card */}
         <View style={styles.newEntryCard}>
@@ -94,12 +101,12 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     marginBottom: SPACING.sm,
     borderRadius: RADIUS.xl,
-    backgroundColor: '#F1F5F9', // Subtle gray background for the card
+    backgroundColor: '#F1F5F9',
   },
   iconContainer: {
     width: 48, height: 48,
     borderRadius: RADIUS.lg,
-    backgroundColor: '#FFFFFF', // White background for the icon
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
@@ -110,6 +117,9 @@ const styles = StyleSheet.create({
   txRight: { alignItems: 'flex-end' },
   txAmount: { fontSize: 16, fontWeight: '800', marginBottom: 4 },
   txDate: { color: '#94A3B8', fontSize: 10, fontWeight: '600', textTransform: 'uppercase' },
+
+  emptyState: { padding: 40, alignItems: 'center' },
+  emptyText: { color: COLORS.textMuted, fontSize: 14, fontWeight: '600' },
 
   newEntryCard: { 
     padding: SPACING.xl, 

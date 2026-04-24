@@ -3,7 +3,10 @@ import * as Sharing from 'expo-sharing';
 import { Transaction } from '../types';
 import { transactionsToCSV } from './index';
 
+import { useToastStore } from '@/store/toast';
+
 export const exportTransactionsCSV = async (transactions: Transaction[]) => {
+  const toast = useToastStore.getState();
   const csv = transactionsToCSV(transactions);
   const filename = `SovereignLedger_Export_${new Date().toISOString().slice(0, 10)}.csv`;
   const fileUri = `${FileSystem.documentDirectory}${filename}`;
@@ -20,10 +23,12 @@ export const exportTransactionsCSV = async (transactions: Transaction[]) => {
         dialogTitle: 'Export Transactions',
         UTI: 'public.comma-separated-values-text',
       });
+      toast.show('Data exported successfully!', 'success');
     } else {
-      console.error('Sharing is not available');
+      toast.show('Sharing is not available on this device', 'error');
     }
   } catch (error) {
     console.error('Error exporting CSV:', error);
+    toast.show('Failed to export data', 'error');
   }
 };
