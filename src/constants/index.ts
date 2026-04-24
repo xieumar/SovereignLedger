@@ -12,6 +12,7 @@ export const CATEGORY_META: Record<TransactionCategory, CategoryMeta> = {
   savings:       { label: 'Savings',          color: '#82E0AA', icon: 'piggy-bank' },
   investment:    { label: 'Investment',       color: '#76D7C4', icon: 'trending-up' },
   crypto:        { label: 'Crypto',           color: '#F0B27A', icon: 'bitcoin' },
+  groceries:     { label: 'Groceries',        color: '#4A90E2', icon: 'shopping-cart' },
   other:         { label: 'Other',            color: '#AEB6BF', icon: 'more-horizontal' },
 };
 

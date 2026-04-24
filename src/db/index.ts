@@ -72,6 +72,41 @@ export const initDB = async (): Promise<void> => {
   await db.runAsync(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, ['isVerified', 'false']);
   await db.runAsync(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, ['isAuthenticated', 'false']);
   await db.runAsync(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, ['currentUserId', '']);
+
+  const now = new Date();
+  const day = 86400000;
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+
+  // Seed Budgets (6 categories as requested)
+  const mockBudgets = [
+    ['b_b1', 'transport', 700, 'monthly', start, end, now.toISOString()],
+    ['b_b2', 'food', 500, 'monthly', start, end, now.toISOString()],
+    ['b_b3', 'groceries', 300, 'monthly', start, end, now.toISOString()],
+    ['b_b4', 'utilities', 250, 'monthly', start, end, now.toISOString()],
+    ['b_b5', 'entertainment', 300, 'monthly', start, end, now.toISOString()],
+    ['b_b6', 'other', 300, 'monthly', start, end, now.toISOString()],
+  ];
+
+  for (const b of mockBudgets) {
+    await db.runAsync(`INSERT OR IGNORE INTO budgets (id, category, \`limit\`, period, startDate, endDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`, b);
+  }
+
+  // Seed matching Transactions to populate the "Spent" amounts
+  const mockTxs = [
+    ['m_tx1', 'expense', 320, 'transport', 'Fuel & Commute', now.toISOString(), 0, null, null, now.toISOString()],
+    ['m_tx2', 'expense', 485, 'food', 'Dining Out & Restaurants', now.toISOString(), 0, null, null, now.toISOString()],
+    ['m_tx3', 'expense', 250, 'groceries', 'Grocery Shopping', now.toISOString(), 0, null, null, now.toISOString()],
+    ['m_tx4', 'expense', 150, 'utilities', 'Electricity & Water', now.toISOString(), 0, null, null, now.toISOString()],
+    ['m_tx5', 'expense', 200, 'entertainment', 'Movies & Gaming', now.toISOString(), 0, null, null, now.toISOString()],
+    ['m_tx6', 'expense', 100, 'other', 'Miscellaneous', now.toISOString(), 0, null, null, now.toISOString()],
+    ['m_tx_salary', 'income', 5000, 'salary', 'Monthly Salary', new Date(now.getTime() - 2*day).toISOString(), 0, null, null, now.toISOString()],
+    ['m_tx_rent', 'expense', 1200, 'rent', 'Studio Rent', new Date(now.getTime() - 5*day).toISOString(), 0, null, null, now.toISOString()],
+  ];
+
+  for (const tx of mockTxs) {
+    await db.runAsync(`INSERT OR IGNORE INTO transactions (id, type, amount, category, description, date, isRecurring, recurringFrequency, recurringEndDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, tx);
+  }
 };
 
 // ─── Transactions ─────────────────────────────────────────────────────────────

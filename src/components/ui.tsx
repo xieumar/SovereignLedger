@@ -141,6 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: SPACING.md,
+    marginTop: SPACING.md,
   },
   sectionTitle: { color: COLORS.textPrimary, fontSize: 17, fontWeight: '700' },
   sectionAction: { color: COLORS.primary, fontSize: 13, fontWeight: '600' },

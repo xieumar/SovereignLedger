@@ -144,6 +144,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     if (user && user.password === pass) {
       await setSettings({ isAuthenticated: 'true', currentUserId: user.id });
       set(s => ({ settings: { ...s.settings, isAuthenticated: true, currentUserId: user.id } }));
+      await get().refresh();
       return true;
     }
     return false;
@@ -163,6 +164,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     await insertUser(newUser);
     await setSettings({ isAuthenticated: 'true', currentUserId: newUser.id });
     set(s => ({ settings: { ...s.settings, isAuthenticated: true, currentUserId: newUser.id } }));
+    await get().refresh();
     return true;
   },
 

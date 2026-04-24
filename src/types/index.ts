@@ -10,6 +10,7 @@ export type TransactionCategory =
   | 'savings'
   | 'investment'
   | 'crypto'
+  | 'groceries'
   | 'other';
 
 export type TransactionType = 'income' | 'expense';
