@@ -5,12 +5,29 @@ import { ChevronLeft, User, AlignLeft } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Button, Card } from '@/components/ui';
+import { useFinanceStore } from '@/store';
 
 export default function NewCategoryScreen() {
   const router = useRouter();
+  const { addBudget } = useFinanceStore();
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [budget, setBudget] = useState('0.00');
+
+  const handleSave = async () => {
+    const amount = parseFloat(budget);
+    if (isNaN(amount) || amount <= 0 || !name) return;
+
+    await addBudget({
+      category: 'other', 
+      name: name,
+      limit: amount,
+      period: 'monthly',
+      startDate: new Date().toISOString(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    router.back();
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -36,7 +53,7 @@ export default function NewCategoryScreen() {
                 <User size={18} color={COLORS.textMuted} />
                 <TextInput
                   style={styles.input}
-                  placeholder="John Doe"
+                  placeholder="Category Name"
                   value={name}
                   onChangeText={setName}
                   placeholderTextColor={COLORS.textMuted}
@@ -81,7 +98,7 @@ export default function NewCategoryScreen() {
 
           <Button 
             label="Save Up!" 
-            onPress={() => router.back()} 
+            onPress={handleSave} 
             style={styles.saveBtn}
             size="lg"
           />

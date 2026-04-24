@@ -33,6 +33,7 @@ export interface Transaction {
 export interface Budget {
   id: string;
   category: TransactionCategory;
+  name?: string;
   limit: number;
   period: 'weekly' | 'monthly' | 'yearly';
   startDate: string;

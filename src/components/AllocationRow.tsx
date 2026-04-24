@@ -26,14 +26,13 @@ const LABEL_MAP: any = {
   groceries: 'Groceries',
   utilities: 'Utilities',
   entertainment: 'Entertainment',
-  other: 'Transportation', // Mapping 'other' to match the 6th card in image
+  other: 'Transportation',
 };
 
 export const AllocationRow = () => {
   const { budgets, transactions } = useFinanceStore();
   const spendingMap = spendingByCategory(transactions);
 
-  // If no budgets, show nothing or empty state
   if (budgets.length === 0) return null;
 
   return (
@@ -43,8 +42,8 @@ export const AllocationRow = () => {
         const left = Math.max(0, b.limit - spent);
         const progress = Math.min(1, spent / b.limit);
         const Icon = ICON_MAP[b.category] || MoreHorizontal;
-        const label = LABEL_MAP[b.category] || (b.category.charAt(0).toUpperCase() + b.category.slice(1).replace('-', ' '));
-            
+        const label = b.name || LABEL_MAP[b.category] || (b.category.charAt(0).toUpperCase() + b.category.slice(1).replace('-', ' '));
+             
         const barColor = progress > 0.8 ? COLORS.expense : COLORS.primary;
 
         return (

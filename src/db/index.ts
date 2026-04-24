@@ -42,6 +42,7 @@ export const initDB = async (): Promise<void> => {
     CREATE TABLE IF NOT EXISTS budgets (
       id TEXT PRIMARY KEY,
       category TEXT NOT NULL,
+      name TEXT,
       \`limit\` REAL NOT NULL,
       period TEXT NOT NULL,
       startDate TEXT NOT NULL,
@@ -49,6 +50,12 @@ export const initDB = async (): Promise<void> => {
       createdAt TEXT NOT NULL
     );
   `);
+
+  try {
+    await db.execAsync(`ALTER TABLE budgets ADD COLUMN name TEXT;`);
+  } catch (e) {
+    // Column might already exist
+  }
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -85,7 +92,6 @@ export const initDB = async (): Promise<void> => {
     ['b_b3', 'groceries', 300, 'monthly', start, end, now.toISOString()],
     ['b_b4', 'utilities', 250, 'monthly', start, end, now.toISOString()],
     ['b_b5', 'entertainment', 300, 'monthly', start, end, now.toISOString()],
-    ['b_b6', 'other', 300, 'monthly', start, end, now.toISOString()],
   ];
 
   for (const b of mockBudgets) {
@@ -173,9 +179,9 @@ const rowToTransaction = (row: any): Transaction => ({
 export const insertBudget = async (budget: Budget): Promise<void> => {
   const db = await getDB();
   await db.runAsync(
-    `INSERT INTO budgets (id, category, \`limit\`, period, startDate, endDate, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [budget.id, budget.category, budget.limit, budget.period, budget.startDate, budget.endDate, budget.createdAt]
+    `INSERT INTO budgets (id, category, name, \`limit\`, period, startDate, endDate, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [budget.id, budget.category, budget.name ?? null, budget.limit, budget.period, budget.startDate, budget.endDate, budget.createdAt]
   );
 };
 
@@ -185,6 +191,7 @@ export const getAllBudgets = async (): Promise<Budget[]> => {
   return rows.map((r: any): Budget => ({
     id:        r.id,
     category:  r.category,
+    name:      r.name ?? undefined,
     limit:     r.limit,
     period:    r.period,
     startDate: r.startDate,

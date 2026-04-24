@@ -2,36 +2,55 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, User, Plus, ShoppingBag, Home, Utensils, Heart, Shirt, LayoutGrid } from 'lucide-react-native';
+import { Bell, User, Plus, ShoppingBag, Banknote, Utensils, Heart, Shirt, LayoutGrid, MoreHorizontal, Car, ShoppingCart, Zap, Film, Briefcase, Home, PiggyBank, TrendingUp, Bitcoin } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Card, Badge, Button } from '@/components/ui';
+import { useFinanceStore } from '@/store';
+import { calcTotalExpenses } from '@/utils';
+import { SpendingVelocityCard } from '@/components/SpendingVelocityCard';
+import { CategoryCarousel } from '@/components/CategoryCarousel';
 
 const { width: W } = Dimensions.get('window');
 
+const ICON_MAP: any = {
+  food: Utensils,
+  transport: Car,
+  shopping: ShoppingCart,
+  utilities: Zap,
+  entertainment: Film,
+  health: Heart,
+  salary: Briefcase,
+  rent: Home,
+  savings: PiggyBank,
+  investment: TrendingUp,
+  crypto: Bitcoin,
+  other: MoreHorizontal,
+};
+
+const getIconForName = (name?: string, category?: string) => {
+  const n = (name || '').toLowerCase();
+  if (n.includes('food') || n.includes('eat') || n.includes('dining') || n.includes('cheese') || n.includes('restaurant')) return Utensils;
+  if (n.includes('car') || n.includes('travel') || n.includes('uber') || n.includes('drive') || n.includes('transport')) return Car;
+  if (n.includes('shop') || n.includes('amazon') || n.includes('buy') || n.includes('store')) return ShoppingBag;
+  if (n.includes('home') || n.includes('rent') || n.includes('house')) return Home;
+  if (n.includes('health') || n.includes('med') || n.includes('hospital')) return Heart;
+  if (n.includes('bill') || n.includes('utility') || n.includes('electric') || n.includes('water')) return Zap;
+  if (n.includes('movie') || n.includes('game') || n.includes('play') || n.includes('fun')) return Film;
+  if (n.includes('salary') || n.includes('pay') || n.includes('work')) return Briefcase;
+  
+  return ICON_MAP[category || ''] || MoreHorizontal;
+};
+
 export default function BudgetsScreen() {
   const router = useRouter();
+  const { transactions, budgets } = useFinanceStore();
 
-  const velocityData = [
-    { day: 'MON', val: 0.4 },
-    { day: 'TUE', val: 0.6 },
-    { day: 'WED', val: 0.9 },
-    { day: 'THU', val: 0.5 },
-    { day: 'FRI', val: 0.75 },
-    { day: 'SAT', val: 0.7 },
-    { day: 'SUN', val: 0.72 },
-  ];
+  const totalExpenses = calcTotalExpenses(transactions);
+  const totalBudget = budgets.reduce((acc, b) => acc + b.limit, 0);
+  const remainingBudget = Math.max(0, totalBudget - totalExpenses);
+  const burnPercent = totalBudget > 0 ? (totalExpenses / totalBudget) : 0;
 
-  const categories = [
-    { id: 1, name: 'Utilities', icon: Utensils, limit: 1200, spent: 1150, color: '#FF4757' },
-    { id: 2, name: 'Health & Fitness', icon: Heart, limit: 1500, spent: 500, color: COLORS.primary },
-    { id: 3, name: 'Clothing', icon: Shirt, limit: 1000, spent: 800, color: COLORS.primaryDark },
-  ];
-
-  const quickCategories = [
-    { name: 'Shop', icon: ShoppingBag },
-    { name: 'Home', icon: Home },
-    { name: 'View', icon: LayoutGrid, isAction: true },
-  ];
+  const mockVelocityData = [30, 65, 95, 45, 80, 75, 85];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -54,107 +73,75 @@ export default function BudgetsScreen() {
           <View style={styles.burnHeader}>
             <View>
               <Text style={styles.burnOverline}>MONTHLY BURN</Text>
-              <Text style={styles.burnAmount}>$4,280.00</Text>
+              <Text style={styles.burnAmount}>${totalExpenses.toLocaleString()}</Text>
             </View>
             <View style={styles.onTrackPill}>
-              <Text style={styles.onTrackText}>ON TRACK</Text>
+              <Text style={styles.onTrackText}>{burnPercent < 0.9 ? 'ON TRACK' : 'WARNING'}</Text>
             </View>
           </View>
           
           <View style={styles.burnTrack}>
-            <View style={[styles.burnFill, { width: '50%' }]} />
+            <View style={[styles.burnFill, { width: `${Math.min(1, burnPercent) * 100}%` }]} />
           </View>
           
           <View style={styles.burnFooter}>
-            <Text style={styles.burnFooterText}>50% of $8,560.00 limit</Text>
-            <Text style={styles.burnFooterText}>$2,176.00 left</Text>
+            <Text style={styles.burnFooterText}>{Math.round(burnPercent * 100)}% of ${totalBudget.toLocaleString()} limit</Text>
+            <Text style={styles.burnFooterText}>${remainingBudget.toLocaleString()} left</Text>
           </View>
         </Card>
 
         {/* Spending Velocity */}
-        <Card style={styles.velocityCard}>
-          <View style={styles.velocityHeader}>
-            <View>
-              <Text style={styles.velocityTitle}>Spending Velocity</Text>
-              <Text style={styles.velocitySub}>Trend relative to baseline</Text>
-            </View>
-            <View style={styles.velocityPill}>
-              <Text style={styles.velocityPillText}>↘ 12.4%</Text>
-            </View>
-          </View>
-
-          <View style={styles.velocityChart}>
-            {velocityData.map((d, i) => (
-              <View key={i} style={styles.barContainer}>
-                <View style={styles.barBg}>
-                  <View style={[styles.barFill, { height: `${d.val * 100}%` }]} />
-                </View>
-                <Text style={styles.barLabel}>{d.day}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.remainingPill}>
-            <View style={styles.remainingIconWrap}>
-              <View style={styles.remainingIconInner} />
-            </View>
-            <Text style={styles.remainingLabel}>Budget Remaining</Text>
-            <Text style={styles.remainingValue}>$1,240.00</Text>
-          </View>
-        </Card>
-
-        {/* Category List */}
-        <View style={styles.categoryScrollWrap}>
-          <Text style={styles.categorySectionLabel}>CATEGORY</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
-            {quickCategories.map((cat, i) => (
-              <TouchableOpacity key={i} style={[styles.quickCatBtn, cat.isAction && styles.quickCatAction]}>
-                <View style={[styles.quickCatIcon, cat.isAction && styles.quickCatIconAction]}>
-                  <cat.icon size={20} color={cat.isAction ? COLORS.primary : COLORS.textPrimary} />
-                </View>
-                <Text style={styles.quickCatLabel}>{cat.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+        <View style={styles.section}>
+          <SpendingVelocityCard 
+            remaining={remainingBudget}
+            velocity={12.4}
+            data={mockVelocityData}
+          />
         </View>
 
-        {/* Add New Category Button */}
-        <Button 
-          label="Add New Category" 
-          onPress={() => router.push('/new-category' as any)} 
-          style={styles.addBtn}
-          size="lg"
-        />
+        {/* Category List */}
+        <Card style={styles.categoryCard}>
+          <Text style={styles.categoryLabel}>CATEGORY</Text>
+          <CategoryCarousel />
+          
+          <Button 
+            label="Add New Category" 
+            onPress={() => router.push('/new-category')} 
+            style={styles.addBtn}
+            size="lg"
+          />
+        </Card>
 
-        {/* Categories Section */}
+        {/* Categories Detail Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <TouchableOpacity onPress={() => router.push('/categories' as any)}>
+          <Text style={styles.sectionTitle}>Budget Breakdown</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/allocations')}>
             <Text style={styles.viewAll}>VIEW ALL</Text>
           </TouchableOpacity>
         </View>
 
-        {categories.map((cat) => (
-          <Card key={cat.id} style={styles.catItem}>
-            <View style={styles.catItemHeader}>
-              <cat.icon size={16} color={COLORS.primary} />
-            </View>
-            <Text style={styles.catItemName}>{cat.name}</Text>
-            <View style={styles.catItemTrack}>
-              <View style={[styles.catItemFill, { width: `${(cat.spent / cat.limit) * 100}%`, backgroundColor: cat.color }]} />
-            </View>
-            <View style={styles.catItemFooter}>
-              <Text style={styles.catItemSpent}>${cat.spent}</Text>
-              <Text style={[styles.catItemLeft, { color: cat.spent > cat.limit ? COLORS.expense : COLORS.textMuted }]}>
-                ${Math.abs(cat.limit - cat.spent)} {cat.spent > cat.limit ? 'OVER' : 'LEFT'}
-              </Text>
-            </View>
-          </Card>
-        ))}
+        {budgets.map((b) => {
+          const spent = transactions.filter(t => t.category === b.category).reduce((acc, t) => acc + t.amount, 0);
+          const Icon = getIconForName(b.name, b.category);
+          return (
+            <Card key={b.id} style={styles.catItem}>
+              <View style={styles.catItemHeader}>
+                <Icon size={16} color={COLORS.primary} />
+              </View>
+              <Text style={styles.catItemName}>{b.name || b.category.toUpperCase()}</Text>
+              <View style={styles.catItemTrack}>
+                <View style={[styles.catItemFill, { width: `${Math.min(1, spent/b.limit) * 100}%`, backgroundColor: COLORS.primary }]} />
+              </View>
+              <View style={styles.catItemFooter}>
+                <Text style={styles.catItemSpent}>${spent.toLocaleString()}</Text>
+                <Text style={[styles.catItemLeft, { color: spent > b.limit ? COLORS.expense : COLORS.textMuted }]}>
+                  ${Math.max(0, b.limit - spent).toLocaleString()} LEFT
+                </Text>
+              </View>
+            </Card>
+          );
+        })}
       </ScrollView>
-
-      {/* Placeholder Bottom Tab Highlight */}
-      <View style={styles.bottomHighlight} />
     </SafeAreaView>
   );
 }
@@ -181,6 +168,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
   content: { padding: SPACING.md, paddingBottom: 140 },
+  section: { marginBottom: SPACING.lg },
 
   // Burn Card
   burnCard: { 
@@ -216,84 +204,20 @@ const styles = StyleSheet.create({
   burnFooter: { flexDirection: 'row', justifyContent: 'space-between' },
   burnFooterText: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '600' },
 
-  // Velocity Card
-  velocityCard: { padding: SPACING.lg, marginBottom: SPACING.lg, borderRadius: RADIUS.xl },
-  velocityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.xl },
-  velocityTitle: { color: COLORS.textPrimary, fontSize: 17, fontWeight: '700', marginBottom: 2 },
-  velocitySub: { color: COLORS.textMuted, fontSize: 12, fontWeight: '500' },
-  velocityPill: { backgroundColor: '#E6F4F0', paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.full },
-  velocityPillText: { color: '#008A5E', fontSize: 12, fontWeight: '800' },
-  
-  velocityChart: { 
-    height: 150, 
-    flexDirection: 'row', 
-    alignItems: 'flex-end', 
-    justifyContent: 'space-between', 
-    paddingBottom: SPACING.md,
-    marginBottom: SPACING.md,
-  },
-  barContainer: { alignItems: 'center', width: (W - 80) / 7 },
-  barBg: { 
-    width: 32, 
-    height: 120, 
-    backgroundColor: '#F1F5F9', 
-    borderRadius: 8, 
-    justifyContent: 'flex-end',
-    overflow: 'hidden'
-  },
-  barFill: { 
-    width: '100%', 
-    backgroundColor: '#8DA6CA', 
-    borderRadius: 8,
-  },
-  barLabel: { marginTop: 8, fontSize: 10, fontWeight: '700', color: COLORS.textMuted },
-
-  remainingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  categoryCard: {
+    padding: SPACING.lg,
+    borderRadius: RADIUS.xxl,
     backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    marginBottom: SPACING.xl,
   },
-  remainingIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#008A5E',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
+  categoryLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+    letterSpacing: 1,
+    marginBottom: SPACING.sm,
   },
-  remainingIconInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#008A5E',
-  },
-  remainingLabel: { flex: 1, fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
-  remainingValue: { fontSize: 15, fontWeight: '800', color: '#008A5E' },
-
-  // Categories
-  categoryScrollWrap: { marginBottom: SPACING.lg },
-  categorySectionLabel: { fontSize: 11, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1, marginBottom: SPACING.md, marginLeft: 4 },
-  categoryScroll: { gap: SPACING.md, paddingLeft: 4 },
-  quickCatBtn: { alignItems: 'center', gap: 8 },
-  quickCatIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickCatIconAction: { backgroundColor: '#E0E7FF' },
-  quickCatAction: {},
-  quickCatLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary },
-
-  addBtn: { marginBottom: SPACING.xl, backgroundColor: COLORS.primaryDark },
+  addBtn: { marginTop: SPACING.lg, backgroundColor: COLORS.primaryDark },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: COLORS.textPrimary },
@@ -309,6 +233,4 @@ const styles = StyleSheet.create({
   catItemFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   catItemSpent: { fontSize: 18, fontWeight: '800', color: COLORS.textPrimary },
   catItemLeft: { fontSize: 11, fontWeight: '700' },
-
-  bottomHighlight: { height: 2, width: 40, backgroundColor: COLORS.primary, position: 'absolute', bottom: 10, alignSelf: 'center' },
 });

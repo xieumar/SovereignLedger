@@ -1,9 +1,9 @@
 import React from 'react';
-import {
+import { 
   View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Settings, User, ScanLine, Edit, CreditCard, Wallet, MoreHorizontal, ShoppingBag, Banknote, Utensils } from 'lucide-react-native';
+import { Bell, User, MoreHorizontal, ShoppingBag, Banknote, Settings } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Card, SectionHeader} from '@/components/ui';
 import { BalanceCard } from '@/components/BalanceCard';
@@ -13,11 +13,11 @@ import { FloatingActionButton } from '@/components/FloatingActionButton';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 
 import { useFinanceStore } from '@/store';
-import { calcBalance, calcTotalIncome, calcTotalExpenses, spendingByCategory, last6MonthLabels, spendingLast6Months } from '@/utils';
+import { calcBalance, calcTotalIncome, calcTotalExpenses, last6MonthLabels, spendingLast6Months } from '@/utils';
 
 export default function OverviewScreen() {
   const router = useRouter();
-  const { transactions, budgets, settings, refresh, isLoading } = useFinanceStore();
+  const { transactions, settings, refresh, isLoading } = useFinanceStore();
 
   const balance = calcBalance(transactions);
   const totalIncome = calcTotalIncome(transactions);
@@ -26,15 +26,13 @@ export default function OverviewScreen() {
   const spendData = spendingLast6Months(transactions);
   const monthLabels = last6MonthLabels();
 
-  const spendingMap = spendingByCategory(transactions);
-  
   const savings = [
     { label: 'INVESTMENTS', percent: 65, color: COLORS.primary },
     { label: 'CASH SAVINGS', percent: 25, color: COLORS.primaryLight },
     { label: 'CRYPTO VAULT', percent: 10, color: COLORS.accent },
   ];
 
-  const recentTransactions = transactions.slice(0, 3);
+  const recentTransactions = transactions.slice(0, 5);
 
   return (
     <View style={styles.root}>
@@ -84,7 +82,7 @@ export default function OverviewScreen() {
           <View style={styles.trendHeader}>
             <View>
               <Text style={styles.trendTitle}>Spending Trend</Text>
-              <Text style={styles.trendSub}>OCT 1 - OCT 15, 2023</Text>
+              <Text style={styles.trendSub}>DAILY ACTIVITY</Text>
             </View>
             <MoreHorizontal size={20} color={COLORS.primary} />
           </View>
@@ -98,7 +96,7 @@ export default function OverviewScreen() {
         {/* Savings */}
         <Card style={[styles.section, styles.savingsCard]}>
           <View style={styles.savingsHeader}>
-            <Text style={styles.savingsTitle}>Savings</Text>
+            <Text style={styles.savingsTitle}>Savings Goals</Text>
             <Settings size={16} color={COLORS.primary} />
           </View>
           {savings.map((s, i) => (
@@ -189,24 +187,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   balanceCard: { marginHorizontal: SPACING.md, marginBottom: SPACING.md },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.xl,
-    marginBottom: SPACING.xl,
-  },
-  quickActionBtn: {
-    width: 54, height: 54,
-    borderRadius: 16,
-    backgroundColor: COLORS.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   section: { marginHorizontal: SPACING.md, marginBottom: SPACING.lg },
   trendHeader: {
     flexDirection: 'row',
