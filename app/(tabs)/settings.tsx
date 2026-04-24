@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
   Bell, User, ChevronRight, ShieldCheck, KeyRound, 
   Banknote, Globe, HelpCircle, LogOut, Settings as SettingsIcon,
-  MessageSquare
+  MessageSquare, FileText
 } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Card } from '@/components/ui';
+import { useFinanceStore } from '@/store';
+import { exportTransactionsCSV } from '@/utils/export';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { transactions } = useFinanceStore();
   const [biometrics, setBiometrics] = useState(true);
 
   const SettingItem = ({ icon: Icon, title, sub, onPress, right }: any) => (
@@ -108,6 +111,13 @@ export default function SettingsScreen() {
             title="Language" 
             sub="English (US)"
             onPress={() => {}}
+          />
+          <View style={styles.divider} />
+          <SettingItem 
+            icon={FileText} 
+            title="Export Data" 
+            sub="Download as CSV"
+            onPress={() => exportTransactionsCSV(transactions)}
           />
           <View style={styles.divider} />
           <SettingItem 

@@ -7,9 +7,12 @@ import Svg, { G, Circle } from 'react-native-svg';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Card, SectionHeader } from '@/components/ui';
 
+import { useFinanceStore } from '@/store';
+import { calcTotalExpenses, spendingByCategory, formatCompact } from '@/utils';
+
 const { width: W } = Dimensions.get('window');
 
-const DonutChart = ({ data }: { data: any[] }) => {
+const DonutChart = ({ data, total }: { data: any[], total: number }) => {
   const radius = 35;
   const strokeWidth = 10;
   const center = 50;
@@ -21,7 +24,7 @@ const DonutChart = ({ data }: { data: any[] }) => {
     <View style={styles.donutContainer}>
       <Svg width="140" height="140" viewBox="0 0 100 100">
         <G rotation="-90" origin="50, 50">
-          {data.map((item, index) => {
+          {data.length > 0 ? data.map((item, index) => {
             const strokeDasharray = `${(item.percent / 100) * circumference} ${circumference}`;
             const strokeDashoffset = -currentOffset;
             currentOffset += (item.percent / 100) * circumference;
@@ -40,12 +43,21 @@ const DonutChart = ({ data }: { data: any[] }) => {
                 strokeLinecap="round"
               />
             );
-          })}
+          }) : (
+            <Circle
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke="#E2E8F0"
+              strokeWidth={strokeWidth}
+              fill="transparent"
+            />
+          )}
         </G>
       </Svg>
       <View style={styles.donutCenter}>
         <Text style={styles.donutTotalLabel}>TOTAL</Text>
-        <Text style={styles.donutTotalVal}>$14.2K</Text>
+        <Text style={styles.donutTotalVal}>{formatCompact(total)}</Text>
       </View>
     </View>
   );
@@ -54,22 +66,34 @@ const DonutChart = ({ data }: { data: any[] }) => {
 export default function AnalyticsScreen() {
   const [tab, setTab] = useState('Monthly');
   const router = useRouter();
+  const { transactions, budgets } = useFinanceStore();
+
+  const totalExpenses = calcTotalExpenses(transactions);
+  const spendingMap = spendingByCategory(transactions);
+  
+  const categoryColors: any = {
+    food: COLORS.primaryDark,
+    transport: COLORS.primary,
+    salary: '#00D4AA',
+    shopping: '#F59E0B',
+    rent: '#EF4444',
+    other: '#E2E8F0',
+  };
+
+  const allocationData = Object.entries(spendingMap).map(([cat, amount]) => ({
+    label: cat.charAt(0).toUpperCase() + cat.slice(1),
+    percent: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0,
+    color: categoryColors[cat] || '#E2E8F0',
+  })).sort((a,b) => b.percent - a.percent);
 
   const velocityData = [
-    { day: 'MON', val: 0.4 },
+    { day: 'MON', val: 0.4 }, // Still mock for now, but could be real
     { day: 'TUE', val: 0.6 },
     { day: 'WED', val: 0.9 },
     { day: 'THU', val: 0.5 },
     { day: 'FRI', val: 0.75 },
     { day: 'SAT', val: 0.7 },
     { day: 'SUN', val: 0.72 },
-  ];
-
-  const allocationData = [
-    { label: 'Personal Expense', percent: 45, color: COLORS.primaryDark },
-    { label: 'Investment', percent: 25, color: COLORS.primary },
-    { label: 'Leisure', percent: 15, color: '#00D4AA' },
-    { label: 'Other', percent: 15, color: '#E2E8F0' },
   ];
 
   return (
@@ -146,18 +170,18 @@ export default function AnalyticsScreen() {
         {/* Total Spent Card */}
         <Card style={styles.spentCard}>
           <Text style={styles.spentLabel}>Total Spent</Text>
-          <Text style={styles.spentAmount}>$4,280.00</Text>
+          <Text style={styles.spentAmount}>{formatCompact(totalExpenses)}</Text>
           <View style={styles.spentTrack}>
-            <View style={[styles.spentFill, { width: '84%' }]} />
+            <View style={[styles.spentFill, { width: `${Math.min(100, (totalExpenses / 5000) * 100)}%` }]} />
           </View>
-          <Text style={styles.spentSub}>+$1,270.00 over budget</Text>
+          <Text style={styles.spentSub}>Target: $5,000.00</Text>
         </Card>
 
         {/* Allocation Donut */}
         <Card style={styles.allocationCard}>
           <SectionHeader title="Allocation" actionLabel="View all" onAction={() => {}} />
           <View style={styles.allocationBody}>
-            <DonutChart data={allocationData} />
+            <DonutChart data={allocationData} total={totalExpenses} />
             <View style={styles.legend}>
               {allocationData.map((item, i) => (
                 <View key={i} style={styles.legendItem}>

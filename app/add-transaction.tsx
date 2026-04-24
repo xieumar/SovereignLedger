@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Dimensions, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Camera, Upload, CheckCircle2, User, AlignLeft, Calendar } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Button, Card } from '@/components/ui';
+import { useFinanceStore } from '@/store';
+import { TransactionCategory } from '@/types';
 
 const { width: W } = Dimensions.get('window');
 
@@ -12,9 +14,29 @@ type Tab = 'Manual' | 'Capture' | 'UploadData';
 
 export default function AddTransactionScreen() {
   const router = useRouter();
+  const { addTransaction } = useFinanceStore();
   const [tab, setTab] = useState<Tab>('Manual');
   const [amount, setAmount] = useState('0.00');
-  const [isIncome, setIsIncome] = useState(false);
+  const [type, setType] = useState<'income' | 'expense'>('expense');
+  const [category, setCategory] = useState<TransactionCategory>('food');
+  const [description, setDescription] = useState('');
+  const [isRecurring, setIsRecurring] = useState(false);
+
+  const handleSave = async () => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) return;
+
+    await addTransaction({
+      type,
+      amount: numAmount,
+      category,
+      description: description || category,
+      date: new Date().toISOString(),
+      isRecurring,
+    });
+
+    router.push('/transactions');
+  };
 
   const KeypadButton = ({ val, onPress }: { val: string, onPress: (v: string) => void }) => (
     <TouchableOpacity style={styles.keyBtn} onPress={() => onPress(val)}>
@@ -65,41 +87,62 @@ export default function AddTransactionScreen() {
             {/* Type Selector (Expenses/Income) */}
             <View style={styles.typeSelector}>
               <TouchableOpacity 
-                style={[styles.typeBtn, !isIncome && styles.typeBtnActive]}
-                onPress={() => setIsIncome(false)}
+                style={[styles.typeBtn, type === 'expense' && styles.typeBtnActive]}
+                onPress={() => setType('expense')}
               >
-                <Text style={[styles.typeText, !isIncome && styles.typeTextActive]}>Expenses</Text>
+                <Text style={[styles.typeText, type === 'expense' && styles.typeTextActive]}>Expenses</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.typeBtn, isIncome && styles.typeBtnActive]}
-                onPress={() => setIsIncome(true)}
+                style={[styles.typeBtn, type === 'income' && styles.typeBtnActive]}
+                onPress={() => setType('income')}
               >
-                <Text style={[styles.typeText, isIncome && styles.typeTextActive]}>Income</Text>
+                <Text style={[styles.typeText, type === 'income' && styles.typeTextActive]}>Income</Text>
               </TouchableOpacity>
             </View>
 
             {/* Form Fields */}
             <Card style={styles.formCard}>
               <View style={styles.inputRow}>
-                <Text style={styles.label}>ADD TRANSACTION</Text>
+                <Text style={styles.label}>DESCRIPTION</Text>
                 <View style={styles.inputWrap}>
-                  <User size={18} color={COLORS.textMuted} />
-                  <TextInput style={styles.input} placeholder="John Doe" placeholderTextColor={COLORS.textMuted} />
+                  <AlignLeft size={18} color={COLORS.textMuted} />
+                  <TextInput 
+                    style={styles.input} 
+                    placeholder="e.g. Coffee, Rent..." 
+                    placeholderTextColor={COLORS.textMuted}
+                    value={description}
+                    onChangeText={setDescription}
+                  />
                 </View>
               </View>
-              <View style={styles.inputRow}>
-                <Text style={styles.label}>ADD TRANSACTION</Text>
-                <View style={styles.inputWrap}>
-                  <Calendar size={18} color={COLORS.textMuted} />
-                  <Text style={styles.inputPlaceholder}>11/24/2023</Text>
-                </View>
-              </View>
+              
               <View style={[styles.inputRow, { borderBottomWidth: 0, marginBottom: 0 }]}>
-                <Text style={styles.label}>ADD ALLOCATION</Text>
+                <Text style={styles.label}>CATEGORY</Text>
                 <View style={styles.inputWrap}>
-                  <Text style={styles.inputPlaceholder}>John Doe</Text>
-                  <ChevronLeft size={18} color={COLORS.textMuted} style={{ transform: [{ rotate: '-90deg' }] }} />
+                  <Text style={styles.inputPlaceholder}>{category.toUpperCase()}</Text>
+                  <TouchableOpacity onPress={() => {
+                    // Simple toggle for demo or show a picker
+                    const cats: TransactionCategory[] = ['food', 'transport', 'shopping', 'salary', 'rent', 'other'];
+                    const next = cats[(cats.indexOf(category) + 1) % cats.length];
+                    setCategory(next);
+                  }}>
+                    <ChevronLeft size={18} color={COLORS.textMuted} style={{ transform: [{ rotate: '-90deg' }] }} />
+                  </TouchableOpacity>
                 </View>
+              </View>
+            </Card>
+
+            <Card style={styles.recurringCard}>
+              <View style={styles.recurringRow}>
+                <View style={styles.recurringLeft}>
+                  <Calendar size={18} color={COLORS.primary} />
+                  <Text style={styles.recurringText}>Set as Recurring</Text>
+                </View>
+                <Switch 
+                  value={isRecurring} 
+                  onValueChange={setIsRecurring}
+                  trackColor={{ false: '#E2E8F0', true: COLORS.primary }}
+                />
               </View>
             </Card>
 
@@ -152,7 +195,7 @@ export default function AddTransactionScreen() {
               </View>
             </View>
 
-            <Button label="Save Up!" onPress={() => router.push('/transactions')} style={styles.saveBtn} size="lg" />
+            <Button label="Save Up!" onPress={handleSave} style={styles.saveBtn} size="lg" />
           </View>
         )}
 
@@ -236,6 +279,11 @@ const styles = StyleSheet.create({
   amountInputWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   currencySymbol: { fontSize: 28, fontWeight: '400', color: COLORS.primaryDark, marginTop: 4 },
   amountVal: { fontSize: 48, fontWeight: '800', color: COLORS.primaryDark },
+
+  recurringCard: { padding: SPACING.md, borderRadius: RADIUS.lg, marginBottom: SPACING.lg },
+  recurringRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  recurringLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  recurringText: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary },
 
   notesGroup: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 8, marginBottom: SPACING.xl },
   notesInput: { flex: 1, fontSize: 14, fontWeight: '600', color: COLORS.textPrimary, paddingTop: 2 },

@@ -6,7 +6,7 @@ import {
   getAllBudgets, insertBudget as dbInsertBudget, deleteBudget as dbDeleteBudget,
   getAppSettings, setSetting,
 } from '../db';
-import { generateId } from '../utils';
+import { generateId, getNextRecurringDate } from '../utils';
 
 interface FinanceState {
   // Data
@@ -39,12 +39,54 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     if (get().isInitialized) return;
     set({ isLoading: true });
     await initDB();
-    const [transactions, budgets, settings] = await Promise.all([
-      getAllTransactions(),
-      getAllBudgets(),
-      getAppSettings(),
-    ]);
-    set({ transactions, budgets, settings, isLoading: false, isInitialized: true });
+    
+    // Initial fetch
+    let transactions = await getAllTransactions();
+    let budgets = await getAllBudgets();
+    let settings = await getAppSettings();
+
+    // Process recurring transactions
+    const now = new Date();
+    let updated = false;
+    
+    for (const tx of transactions) {
+      if (tx.isRecurring && tx.recurringFrequency) {
+        let lastDate = new Date(tx.date);
+        let nextDate = new Date(getNextRecurringDate(tx.date, tx.recurringFrequency));
+        
+        while (nextDate <= now && (!tx.recurringEndDate || nextDate <= new Date(tx.recurringEndDate))) {
+          const newTx: Transaction = {
+            ...tx,
+            id: generateId(),
+            date: nextDate.toISOString(),
+            createdAt: new Date().toISOString(),
+          };
+          await dbInsert(newTx);
+          transactions.push(newTx);
+          
+          // Update the "source" transaction's date to avoid double processing next time
+          // (Actually, we should update the original tx in DB or just keep adding new ones)
+          // Better: The source transaction should be updated to the latest date.
+          tx.date = nextDate.toISOString();
+          await dbUpdate(tx);
+          
+          nextDate = new Date(getNextRecurringDate(tx.date, tx.recurringFrequency));
+          updated = true;
+        }
+      }
+    }
+
+    if (updated) {
+      transactions = await getAllTransactions();
+    }
+
+    set({ 
+      transactions: transactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()), 
+      budgets, 
+      settings, 
+      isLoading: false, 
+      isInitialized: true 
+    });
   },
 
   refresh: async () => {

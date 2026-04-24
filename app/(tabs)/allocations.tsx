@@ -1,22 +1,41 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Bell, User, Utensils, ShoppingBag, Car, Activity, Shirt, Zap, PlusSquare, Home } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Card, Button } from '@/components/ui';
+import { useFinanceStore } from '@/store';
+import { spendingByCategory, formatCompact } from '@/utils';
 
 export default function AllocationsScreen() {
   const router = useRouter();
+  const { budgets, transactions } = useFinanceStore();
+  const [activeFilter, setActiveFilter] = useState('All');
 
-  const allocations = [
-    { id: 1, label: 'Utilities', spent: 150, left: 150, total: 300, isOver: true, icon: Zap },
-    { id: 2, label: 'Entertainment', spent: 200, left: 500, total: 700, isOver: false, icon: ShoppingBag },
-    { id: 3, label: 'Groceries', spent: 250, left: 175, total: 425, isOver: false, icon: Utensils },
-    { id: 4, label: 'Transportation', spent: 100, left: -65, total: 35, isOver: true, icon: Car },
-    { id: 5, label: 'Health & Fitness', spent: 120, left: 300, total: 420, isOver: false, icon: Activity },
-    { id: 6, label: 'Clothing', spent: 180, left: 150, total: 330, isOver: false, icon: Shirt },
-  ];
+  const spendingMap = spendingByCategory(transactions);
+
+  const displayBudgets = budgets.map(b => {
+    const spent = spendingMap[b.category] || 0;
+    const progress = Math.min(100, (spent / b.limit) * 100);
+    
+    let status: 'HEALTHY' | 'AT LIMIT' | 'ON TRACK' = 'ON TRACK';
+    if (progress >= 100) status = 'AT LIMIT';
+    else if (progress > 80) status = 'HEALTHY';
+    
+    return {
+      ...b,
+      spent,
+      progress,
+      status,
+      label: b.category.toUpperCase(),
+      title: b.category.charAt(0).toUpperCase() + b.category.slice(1),
+    };
+  });
+
+  const filteredBudgets = activeFilter === 'All' 
+    ? displayBudgets 
+    : displayBudgets.filter(b => b.status === activeFilter.toUpperCase());
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -26,7 +45,7 @@ export default function AllocationsScreen() {
           <View style={styles.avatar}>
             <User size={18} color={COLORS.textSecondary} />
           </View>
-          <Text style={styles.appName}>Sovereign Ledger</Text>
+          <Text style={styles.appName}>Allocations</Text>
         </View>
         <TouchableOpacity style={styles.iconBtn}>
           <Bell size={20} color={COLORS.textSecondary} />
@@ -34,72 +53,77 @@ export default function AllocationsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Filters */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
-          {['All', 'Food', 'Travel', 'Shop', 'Home', 'Health'].map((f, i) => (
-            <TouchableOpacity key={i} style={[styles.filterPill, i === 0 && styles.filterPillActive]}>
-              <Text style={[styles.filterText, i === 0 && styles.filterTextActive]}>{f}</Text>
+        <Text style={styles.sectionOverline}>FINANCIAL PLANNING</Text>
+        <Text style={styles.title}>Budget Allocation</Text>
+
+        {/* Filter Pills */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
+          {['All', 'Healthy', 'On Track', 'At Limit'].map((f) => (
+            <TouchableOpacity 
+              key={f} 
+              style={[styles.filterPill, activeFilter === f && styles.filterPillActive]}
+              onPress={() => setActiveFilter(f)}
+            >
+              <Text style={[styles.filterText, activeFilter === f && styles.filterTextActive]}>{f}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Allocations</Text>
-          <TouchableOpacity>
-            <Text style={styles.sectionAction}>View All</Text>
-          </TouchableOpacity>
-        </View>
-
-        {[
-          { label: 'Housing', spent: 2450, total: 2500, status: 'AT LIMIT', color: '#FF4757', icon: Home },
-          { label: 'Dining Out', spent: 420, total: 850, status: 'HEALTHY', color: '#00D4AA', icon: Utensils },
-          { label: 'Groceries', spent: 680, total: 1200, status: 'ON TRACK', color: COLORS.primary, icon: ShoppingBag },
-          { label: 'Tickets', spent: 215, total: 450, status: 'ON TRACK', color: COLORS.primaryDark, icon: Car },
-        ].map((a, i) => {
-          const Icon = a.icon;
-          const progress = Math.min(a.spent / a.total, 1);
-          return (
-            <Card key={i} style={styles.allocationCard}>
+        <View style={styles.grid}>
+          {filteredBudgets.map((a) => (
+            <Card key={a.id} style={styles.allocationCard}>
               <View style={styles.cardTop}>
-                <View style={styles.iconWrap}>
-                  <Icon size={16} color={COLORS.primaryDark} />
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardLabel}>{a.label}</Text>
+                  <Text style={styles.cardTitle}>{a.title}</Text>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: a.color + '15' }]}>
-                  <Text style={[styles.statusText, { color: a.color }]}>{a.status}</Text>
+                <View style={[styles.statusBadge, 
+                  a.status === 'AT LIMIT' && { backgroundColor: '#FFF5F5' },
+                  a.status === 'HEALTHY' && { backgroundColor: '#E6F4F0' }
+                ]}>
+                  <Text style={[styles.statusText, 
+                    a.status === 'AT LIMIT' && { color: COLORS.expense },
+                    a.status === 'HEALTHY' && { color: '#008A5E' }
+                  ]}>{a.status}</Text>
                 </View>
               </View>
-              
-              <Text style={styles.cardLabel}>{a.label}</Text>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardSpent}>${a.spent.toLocaleString()}</Text>
-                <Text style={styles.cardTotal}>/ ${a.total.toLocaleString()}</Text>
+
+              <View style={styles.amountRow}>
+                <View>
+                  <Text style={styles.amtLabel}>TOTAL BUDGET</Text>
+                  <Text style={styles.amtVal}>{formatCompact(a.limit)}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.amtLabel}>SPENT SO FAR</Text>
+                  <Text style={styles.amtVal}>{formatCompact(a.spent)}</Text>
+                </View>
               </View>
-              
+
               <View style={styles.progressTrack}>
-                <View 
-                  style={[
-                    styles.progressFill, 
-                    { width: `${progress * 100}%`, backgroundColor: a.color }
-                  ]} 
-                />
+                <View style={[styles.progressFill, { width: `${a.progress}%`, backgroundColor: a.status === 'AT LIMIT' ? COLORS.expense : COLORS.primary }]} />
               </View>
               
               <View style={styles.cardFooter}>
-                <Text style={styles.footerPercent}>{Math.round(progress * 100)}%</Text>
-                <Text style={styles.footerLeft}>${(a.total - a.spent).toLocaleString()} LEFT</Text>
+                <Text style={styles.footerPercent}>{Math.round(a.progress)}%</Text>
+                <Text style={styles.footerLeft}>{formatCompact(Math.max(0, a.limit - a.spent))} LEFT</Text>
               </View>
             </Card>
-          );
-        })}
+          ))}
 
-        <Card style={styles.newEntryCard}>
-          <View style={styles.newEntryIconWrap}>
-            <PlusSquare size={24} color={COLORS.primaryDark} />
-          </View>
-          <Text style={styles.newEntryTitle}>New Entry</Text>
-          <Text style={styles.newEntrySub}>Record a new Allocation</Text>
-          <Button label="Quick Add" onPress={() => {}} style={styles.quickAddBtn} />
-        </Card>
+          <Card style={styles.newEntryCard}>
+            <View style={styles.newEntryIconWrap}>
+              <PlusSquare size={24} color={COLORS.primary} strokeWidth={1.5} />
+            </View>
+            <Text style={styles.newEntryTitle}>New Allocation Entry</Text>
+            <Text style={styles.newEntrySub}>Set a new budget goal</Text>
+            <Button 
+              label="New Allocation" 
+              onPress={() => router.push('/new-allocation')} 
+              style={styles.newEntryBtn}
+              size="sm"
+            />
+          </Card>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -126,38 +150,41 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
-  content: { padding: SPACING.md, paddingBottom: 120 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.lg },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.textPrimary },
-  sectionAction: { fontSize: 13, fontWeight: '700', color: COLORS.primaryDark },
-  
-  filterScroll: { marginBottom: SPACING.xl, marginLeft: -SPACING.md, marginRight: -SPACING.md },
-  filterContent: { paddingHorizontal: SPACING.md, gap: 10 },
-  filterPill: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: RADIUS.full, backgroundColor: '#fff', borderWidth: 1, borderColor: '#F1F5F9' },
+  content: { padding: SPACING.md, paddingBottom: 100 },
+
+  sectionOverline: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1, marginBottom: 4 },
+  title: { fontSize: 24, fontWeight: '800', color: COLORS.primaryDark, marginBottom: SPACING.lg },
+
+  filterContainer: { flexDirection: 'row', marginBottom: SPACING.xl },
+  filterPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: RADIUS.full, backgroundColor: '#fff', marginRight: 10, borderWidth: 1, borderColor: '#F1F5F9' },
   filterPillActive: { backgroundColor: COLORS.primaryDark, borderColor: COLORS.primaryDark },
-  filterText: { fontSize: 13, fontWeight: '700', color: COLORS.textMuted },
+  filterText: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted },
   filterTextActive: { color: '#fff' },
 
-  allocationCard: { padding: SPACING.lg, marginBottom: SPACING.md, borderRadius: RADIUS.xl, borderWidth: 0, backgroundColor: '#fff', shadowOpacity: 0.02 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
-  iconWrap: { width: 36, height: 36, borderRadius: RADIUS.md, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.full },
-  statusText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  grid: { gap: SPACING.lg },
+  allocationCard: { padding: SPACING.lg, borderRadius: RADIUS.xl },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.lg },
+  cardHeader: { flex: 1 },
+  cardLabel: { fontSize: 9, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1, marginBottom: 4 },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: COLORS.textPrimary },
   
-  cardLabel: { fontSize: 13, fontWeight: '700', color: COLORS.textSecondary, marginBottom: 4 },
-  cardRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: SPACING.md },
-  cardSpent: { fontSize: 20, fontWeight: '800', color: COLORS.primaryDark },
-  cardTotal: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm, backgroundColor: '#EEF3FF' },
+  statusText: { fontSize: 10, fontWeight: '800', color: COLORS.primary },
 
-  progressTrack: { height: 4, backgroundColor: '#F1F5F9', borderRadius: 2, marginBottom: 12 },
-  progressFill: { height: '100%', borderRadius: 2 },
+  amountRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.lg },
+  amtLabel: { fontSize: 8, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 0.5, marginBottom: 4 },
+  amtVal: { fontSize: 15, fontWeight: '800', color: COLORS.primaryDark },
+
+  progressTrack: { height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, marginBottom: 12, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 3 },
+
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  footerPercent: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted },
-  footerLeft: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted },
+  footerPercent: { fontSize: 12, fontWeight: '800', color: COLORS.primaryDark },
+  footerLeft: { fontSize: 11, fontWeight: '700', color: COLORS.textMuted },
 
-  newEntryCard: { padding: SPACING.xl, marginTop: SPACING.xl, borderRadius: RADIUS.xl, alignItems: 'center', backgroundColor: '#fff', borderStyle: 'dashed', borderWidth: 2, borderColor: '#E2E8F0' },
-  newEntryIconWrap: { width: 56, height: 56, borderRadius: RADIUS.lg, backgroundColor: '#E0E7FF', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md },
-  newEntryTitle: { fontSize: 16, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 4 },
-  newEntrySub: { fontSize: 12, color: COLORS.textMuted, marginBottom: SPACING.xl },
-  quickAddBtn: { width: '100%', backgroundColor: COLORS.primaryDark },
+  newEntryCard: { padding: SPACING.xl, borderRadius: RADIUS.xl, alignItems: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: 'transparent' },
+  newEntryIconWrap: { width: 48, height: 48, borderRadius: RADIUS.lg, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  newEntryTitle: { fontSize: 17, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 4 },
+  newEntrySub: { fontSize: 13, color: COLORS.textMuted, fontWeight: '600', marginBottom: 20 },
+  newEntryBtn: { backgroundColor: COLORS.primaryDark, borderRadius: RADIUS.lg, paddingHorizontal: 24 },
 });

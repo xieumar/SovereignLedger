@@ -5,7 +5,6 @@ import {
 import { useRouter } from 'expo-router';
 import { Bell, Settings, User, ScanLine, Edit, CreditCard, Wallet, MoreHorizontal, ShoppingBag, Banknote, Utensils } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFinanceStore } from '@/store';
 import { EmptyState, Card, SectionHeader} from '@/components/ui';
 import { BalanceCard } from '@/components/BalanceCard';
 import { AllocationRow } from '@/components/AllocationRow';
@@ -13,18 +12,29 @@ import { SplineChart } from '@/components/SplineChart';
 import { FloatingActionButton } from '@/components/FloatingActionButton';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 
+import { useFinanceStore } from '@/store';
+import { calcBalance, calcTotalIncome, calcTotalExpenses, spendingByCategory, last6MonthLabels, spendingLast6Months } from '@/utils';
+
 export default function OverviewScreen() {
   const router = useRouter();
-  const { settings, refresh, isLoading } = useFinanceStore();
+  const { transactions, budgets, settings, refresh, isLoading } = useFinanceStore();
 
-  const spendData = [120, 200, 150, 300];
-  const monthLabels = ['W1', 'W2', 'W3', 'W4'];
+  const balance = calcBalance(transactions);
+  const totalIncome = calcTotalIncome(transactions);
+  const totalExpenses = calcTotalExpenses(transactions);
 
+  const spendData = spendingLast6Months(transactions);
+  const monthLabels = last6MonthLabels();
+
+  const spendingMap = spendingByCategory(transactions);
+  
   const savings = [
     { label: 'INVESTMENTS', percent: 65, color: COLORS.primary },
     { label: 'CASH SAVINGS', percent: 25, color: COLORS.primaryLight },
     { label: 'CRYPTO VAULT', percent: 10, color: COLORS.accent },
   ];
+
+  const recentTransactions = transactions.slice(0, 3);
 
   return (
     <View style={styles.root}>
@@ -50,12 +60,12 @@ export default function OverviewScreen() {
 
         {/* Balance Card */}
         <BalanceCard
-          balance={42950.40}
-          income={0}
-          expenses={0}
+          balance={balance}
+          income={totalIncome}
+          expenses={totalExpenses}
           currency={settings.currency}
-          onDeposit={() => {}}
-          onWithdraw={() => {}}
+          onDeposit={() => router.push('/add-transaction' as any)}
+          onWithdraw={() => router.push('/add-transaction' as any)}
           style={styles.balanceCard}
         />
 
@@ -111,45 +121,25 @@ export default function OverviewScreen() {
             actionLabel="VIEW ALL"
             onAction={() => router.push('/transactions' as any)}
           />
-          <Card style={styles.txItem}>
-            <View style={styles.txIconWrap}>
-              <ShoppingBag size={16} color={COLORS.primary} />
-            </View>
-            <View style={styles.txBody}>
-              <Text style={styles.txTitle}>Apple Store</Text>
-              <Text style={styles.txSub}>TECHNOLOGY • 2:45 PM</Text>
-            </View>
-            <View style={styles.txRight}>
-              <Text style={[styles.txAmount, { color: COLORS.expense }]}>-$1,299.00</Text>
-              <Text style={styles.txDate}>OCT 12</Text>
-            </View>
-          </Card>
-          <Card style={styles.txItem}>
-            <View style={[styles.txIconWrap, { backgroundColor: COLORS.income + '20' }]}>
-              <Banknote size={16} color={COLORS.income} />
-            </View>
-            <View style={styles.txBody}>
-              <Text style={styles.txTitle}>Dividend Payout</Text>
-              <Text style={styles.txSub}>INVESTMENT • 11:30 AM</Text>
-            </View>
-            <View style={styles.txRight}>
-              <Text style={[styles.txAmount, { color: COLORS.income }]}>+$450.25</Text>
-              <Text style={styles.txDate}>OCT 11</Text>
-            </View>
-          </Card>
-          <Card style={styles.txItem}>
-            <View style={styles.txIconWrap}>
-              <Utensils size={16} color={COLORS.primary} />
-            </View>
-            <View style={styles.txBody}>
-              <Text style={styles.txTitle}>The Gilded Fork</Text>
-              <Text style={styles.txSub}>DINING • 8:15 PM</Text>
-            </View>
-            <View style={styles.txRight}>
-              <Text style={[styles.txAmount, { color: COLORS.expense }]}>-$240.50</Text>
-              <Text style={styles.txDate}>OCT 10</Text>
-            </View>
-          </Card>
+          {recentTransactions.length > 0 ? recentTransactions.map((tx) => (
+            <Card key={tx.id} style={styles.txItem}>
+              <View style={[styles.txIconWrap, { backgroundColor: tx.type === 'income' ? COLORS.income + '20' : COLORS.bg3 }]}>
+                {tx.type === 'income' ? <Banknote size={16} color={COLORS.income} /> : <ShoppingBag size={16} color={COLORS.primary} />}
+              </View>
+              <View style={styles.txBody}>
+                <Text style={styles.txTitle}>{tx.description}</Text>
+                <Text style={styles.txSub}>{tx.category.toUpperCase()} • {new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+              </View>
+              <View style={styles.txRight}>
+                <Text style={[styles.txAmount, { color: tx.type === 'income' ? COLORS.income : COLORS.expense }]}>
+                  {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString()}
+                </Text>
+                <Text style={styles.txDate}>{new Date(tx.date).toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase()}</Text>
+              </View>
+            </Card>
+          )) : (
+            <EmptyState message="No transactions yet" />
+          )}
         </View>
       </ScrollView>
       </SafeAreaView>

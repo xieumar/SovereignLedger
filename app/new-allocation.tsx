@@ -6,21 +6,40 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Button, Card } from '@/components/ui';
 
+import { useFinanceStore } from '@/store';
+import { TransactionCategory } from '@/types';
+
 export default function NewAllocationScreen() {
   const router = useRouter();
+  const { addBudget } = useFinanceStore();
   const [amount, setAmount] = useState('0.00');
   const [timeframe, setTimeframe] = useState('Weekly');
   const [recurring, setRecurring] = useState(false);
   const [notify, setNotify] = useState(true);
-  const [selectedCat, setSelectedCat] = useState('Food');
+  const [selectedCat, setSelectedCat] = useState<TransactionCategory>('food');
+
+  const handleSave = async () => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) return;
+
+    await addBudget({
+      category: selectedCat,
+      limit: numAmount,
+      period: timeframe.toLowerCase() as any,
+      startDate: new Date().toISOString(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // Default 30 days
+    });
+
+    router.back();
+  };
 
   const categories = [
-    { name: 'Food', icon: Utensils },
-    { name: 'Travel', icon: Car },
-    { name: 'Salary', icon: Banknote },
-    { name: 'Shop', icon: ShoppingBag },
-    { name: 'Home', icon: Home },
-    { name: 'Other', icon: MoreHorizontal },
+    { name: 'Food', id: 'food', icon: Utensils },
+    { name: 'Travel', id: 'transport', icon: Car },
+    { name: 'Salary', id: 'salary', icon: Banknote },
+    { name: 'Shop', id: 'shopping', icon: ShoppingBag },
+    { name: 'Home', id: 'rent', icon: Home },
+    { name: 'Other', id: 'other', icon: MoreHorizontal },
   ];
 
   return (
@@ -56,14 +75,14 @@ export default function NewAllocationScreen() {
         <View style={styles.grid}>
           {categories.map((cat) => (
             <TouchableOpacity 
-              key={cat.name} 
-              style={[styles.gridItem, selectedCat === cat.name && styles.gridItemActive]}
-              onPress={() => setSelectedCat(cat.name)}
+              key={cat.id} 
+              style={[styles.gridItem, selectedCat === cat.id && styles.gridItemActive]}
+              onPress={() => setSelectedCat(cat.id as any)}
             >
-              <View style={[styles.iconWrap, selectedCat === cat.name && styles.iconWrapActive]}>
-                <cat.icon size={20} color={selectedCat === cat.name ? '#fff' : COLORS.textPrimary} />
+              <View style={[styles.iconWrap, selectedCat === cat.id && styles.iconWrapActive]}>
+                <cat.icon size={20} color={selectedCat === cat.id ? '#fff' : COLORS.textPrimary} />
               </View>
-              <Text style={[styles.gridLabel, selectedCat === cat.name && styles.gridLabelActive]}>{cat.name}</Text>
+              <Text style={[styles.gridLabel, selectedCat === cat.id && styles.gridLabelActive]}>{cat.name}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -141,7 +160,7 @@ export default function NewAllocationScreen() {
           />
         </View>
 
-        <Button label="Save Up!" onPress={() => router.back()} style={styles.saveBtn} size="lg" />
+        <Button label="Save Up!" onPress={handleSave} style={styles.saveBtn} size="lg" />
       </ScrollView>
     </SafeAreaView>
   );
