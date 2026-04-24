@@ -8,7 +8,6 @@ import { COLORS, SPACING, RADIUS } from '@/constants';
 
 const TAB_ICONS: Record<string, any> = {
   index:          LayoutDashboard,
-  transactions:   ArrowLeftRight,
   analytics:      BarChart3,
   budgets:        Target,
   settings:       Settings,
@@ -16,7 +15,6 @@ const TAB_ICONS: Record<string, any> = {
 
 const TAB_LABELS: Record<string, string> = {
   index:          'Overview',
-  transactions:   'Ledger',
   analytics:      'Insights',
   budgets:        'Budgets',
   settings:       'Settings',
@@ -53,7 +51,6 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" />
-      <Tabs.Screen name="transactions" />
       <Tabs.Screen
         name="add-transaction"
         options={{

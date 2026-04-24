@@ -125,7 +125,7 @@ export default function OverviewScreen() {
           <SectionHeader
             title="Recent Ledger"
             actionLabel="VIEW ALL"
-            onAction={() => {}}
+            onAction={() => router.push('/transactions' as any)}
           />
           <Card style={styles.txItem}>
             <View style={styles.txIconWrap}>

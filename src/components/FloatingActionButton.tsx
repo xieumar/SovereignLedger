@@ -34,17 +34,17 @@ export function FloatingActionButton({ actions }: FloatingActionButtonProps) {
     {
       icon: SquarePen,
       label: 'New Entry',
-      onPress: () => { close(); router.push('/(tabs)/add-transaction' as any); },
+      onPress: () => { close(); router.push('/add-transaction' as any); },
     },
     {
       icon: LayoutGrid,
-      label: 'Overview',
-      onPress: () => { close(); router.push('/(tabs)'); },
+      label: 'New Allocation',
+      onPress: () => { close(); router.push('/new-allocation' as any); },
     },
     {
       icon: FileText,
-      label: 'Ledger',
-      onPress: () => { close(); router.push('/(tabs)/transactions'); },
+      label: 'Ledgers',
+      onPress: () => { close(); router.push('/transactions'); },
     },
   ];
 
