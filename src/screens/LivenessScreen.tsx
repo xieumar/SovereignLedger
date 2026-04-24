@@ -1,471 +1,514 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Animated,
-  Dimensions, Alert, ScrollView
+  View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import { ShieldCheck, Camera, AlertCircle, CheckCircle2, Eye, X, Check, Loader, Lock, Sun, HelpCircle } from 'lucide-react-native';
+import { Video, CheckCircle2, AlertCircle, Lock, X, Shield } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { useFinanceStore } from '@/store';
-import { Button } from '@/components/ui';
 
 const { width: W } = Dimensions.get('window');
-const CAM_WIDTH = W - SPACING.md * 2;
-const CAM_HEIGHT = CAM_WIDTH * 1.3;
+const CIRCLE_SIZE = W * 0.70;
 
-type Step = 'intro' | 'scanning' | 'success' | 'failed';
-
-const INSTRUCTIONS = [
-  'Please blink now',
-  'Turn your head slightly left',
-  'Turn your head slightly right',
-  'Smile naturally',
+// Required challenges first, fun ones after
+const ALL_CHALLENGES = [
+  { id: 'blink',  text: "Blink twice if you're safe" },
+  { id: 'nod',    text: 'Please nod to open' },
+  { id: 'teeth',  text: 'Show us your teeth!' },
+  { id: 'ear',    text: 'Pull your ear' },
+  { id: 'squint', text: 'Squint your left eye' },
+  { id: 'brows',  text: 'Raise your eyebrows' },
+  { id: 'tongue', text: 'Stick out your tongue' },
+  { id: 'wink',   text: 'Give us a wink' },
+  { id: 'smile',  text: 'Smile naturally' },
+  { id: 'head_l', text: 'Turn your head left' },
+  { id: 'head_r', text: 'Turn your head right' },
 ];
+
+function pickChallenges(requiredCount = 2, totalCount = 3) {
+  const required = ALL_CHALLENGES.slice(0, requiredCount);
+  const optional = [...ALL_CHALLENGES.slice(requiredCount)].sort(() => Math.random() - 0.5);
+  return [...required, ...optional].slice(0, totalCount);
+}
+
+const FACE_DETECT_MS  = 1500; // wait before first challenge
+const CHALLENGE_MS    = 2500; // each challenge duration
+
+type Phase = 'intro' | 'challenge' | 'ready' | 'scanning' | 'success' | 'failed';
 
 export default function LivenessScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [step, setStep] = useState<Step>('scanning'); 
-  const [instructionIndex, setInstructionIndex] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const [phase, setPhase] = useState<Phase>('intro');
+  const [challenges] = useState(() => pickChallenges(2, 3));
+  const [idx, setIdx] = useState(-1); // -1 = not started yet
   const { setVerified } = useFinanceStore();
 
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  // ── Animations ──────────────────────────────────────────────────────────────
+  const pulseAnim   = useRef(new Animated.Value(1)).current;
+  const pillOpacity = useRef(new Animated.Value(0)).current;
+  const pillScale   = useRef(new Animated.Value(0.8)).current;
+  const btnOpacity  = useRef(new Animated.Value(0.45)).current;
 
+  // Pulse ring forever
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1100, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 1100, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
 
-    if (step === 'scanning') {
-      startScan();
-    }
-  }, [step]);
+  // Pill pop-in whenever idx changes while in challenge phase
+  useEffect(() => {
+    if (phase !== 'challenge') return;
+    pillOpacity.setValue(0);
+    pillScale.setValue(0.7);
+    Animated.parallel([
+      Animated.spring(pillScale,   { toValue: 1,   friction: 6, tension: 150, useNativeDriver: true }),
+      Animated.timing(pillOpacity, { toValue: 1,   duration: 180, useNativeDriver: true }),
+    ]).start();
+  }, [idx, phase]);
 
-  const startScan = async () => {
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        Alert.alert('Camera required', 'Please allow camera access to proceed.');
-        return;
+  // Button fade in when ready
+  useEffect(() => {
+    Animated.timing(btnOpacity, {
+      toValue: phase === 'ready' ? 1 : 0.45,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, [phase]);
+
+  // ── Step 1: Request permission immediately on mount ─────────────────────────
+  useEffect(() => {
+    requestPermission();
+  }, []);
+
+  // ── Step 2: Once permission granted and we're in intro, start after delay ──
+  useEffect(() => {
+    if (!permission?.granted || phase !== 'intro') return;
+    const t = setTimeout(() => {
+      setIdx(0);
+      setPhase('challenge');
+    }, FACE_DETECT_MS);
+    return () => clearTimeout(t);
+  }, [permission?.granted, phase]);
+
+  // ── Step 3: Auto-advance through challenges ─────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'challenge' || idx < 0) return;
+
+    const t = setTimeout(() => {
+      // Fade pill out, then advance
+      Animated.parallel([
+        Animated.timing(pillOpacity, { toValue: 0,    duration: 180, useNativeDriver: true }),
+        Animated.timing(pillScale,   { toValue: 0.85, duration: 180, useNativeDriver: true }),
+      ]).start(() => {
+        const next = idx + 1;
+        if (next >= challenges.length) {
+          setPhase('ready');
+        } else {
+          setIdx(next); // triggers the pill pop-in useEffect above
+        }
+      });
+    }, CHALLENGE_MS);
+
+    return () => clearTimeout(t);
+  }, [phase, idx]);
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  const handleStartVerification = useCallback(() => {
+    if (phase !== 'ready') return;
+    setPhase('scanning');
+    setTimeout(() => {
+      const ok = Math.random() > 0.1;
+      if (ok) {
+        setVerified(true, new Date(Date.now() + 30 * 60 * 1000).toISOString());
+        setPhase('success');
+      } else {
+        setPhase('failed');
       }
-    }
-    runLivenessSimulation();
-  };
+    }, 2800);
+  }, [phase]);
 
-  const runLivenessSimulation = () => {
-    let idx = 0;
-    const interval = setInterval(() => {
-      idx += 1;
-      setInstructionIndex(idx);
-      const pct = (idx / INSTRUCTIONS.length) * 100;
-      setProgress(pct);
+  const handleRetry = useCallback(() => {
+    pillOpacity.setValue(0);
+    pillScale.setValue(0.8);
+    btnOpacity.setValue(0.45);
+    setIdx(-1);
+    setPhase('intro');
+  }, []);
 
-      if (idx >= INSTRUCTIONS.length) {
-        clearInterval(interval);
-        setTimeout(() => {
-          const success = Math.random() > 0.15; 
-          if (success) {
-            setStep('success');
-            const expiry = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-            setVerified(true, expiry);
-          } else {
-            setStep('failed');
-          }
-        }, 800);
-      }
-    }, 1500);
-  };
+  // ── Current challenge ────────────────────────────────────────────────────────
+  const challenge = challenges[Math.max(0, Math.min(idx, challenges.length - 1))];
+  const isReady   = phase === 'ready';
 
-  const handleSuccess = () => {
-    router.replace('/(tabs)');
-  };
+  // ── Success screen ──────────────────────────────────────────────────────────
+  if (phase === 'success') {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.resultPage}>
+          <View style={[styles.resultIconCircle, { backgroundColor: '#00D4AA20' }]}>
+            <CheckCircle2 size={60} color={COLORS.income} />
+          </View>
+          <Text style={styles.resultTitle}>Verified!</Text>
+          <Text style={styles.resultSub}>Your identity has been confirmed.</Text>
+          <TouchableOpacity
+            style={[styles.verifyBtn, styles.verifyBtnActive]}
+            onPress={() => router.replace('/(tabs)')}
+          >
+            <Text style={styles.verifyBtnText}>Enter Dashboard →</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-  const handleRetry = () => {
-    setStep('scanning');
-    setInstructionIndex(0);
-    setProgress(0);
-  };
+  // ── Failed screen ────────────────────────────────────────────────────────────
+  if (phase === 'failed') {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.resultPage}>
+          <View style={[styles.resultIconCircle, { backgroundColor: '#FF475720' }]}>
+            <AlertCircle size={60} color={COLORS.expense} />
+          </View>
+          <Text style={styles.resultTitle}>Verification Failed</Text>
+          <Text style={styles.resultSub}>
+            We couldn't confirm your liveness. Please try again.
+          </Text>
+          <TouchableOpacity
+            style={[styles.verifyBtn, styles.verifyBtnActive]}
+            onPress={handleRetry}
+          >
+            <Text style={styles.verifyBtnText}>Try Again</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.cancelLink} onPress={() => router.back()}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
+  // ── Main screen ──────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+
+      {/* ── Header close button ── */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
-          <X size={20} color={COLORS.primaryDark} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.closeBtn}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <X size={18} color={COLORS.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>The Sovereign Ledger</Text>
-        <View style={styles.securePill}>
-          <Lock size={10} color={COLORS.accentDark} />
-          <Text style={styles.secureText}>SECURE LINK</Text>
-        </View>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent} 
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-      >
-        <View style={styles.content}>
-          <Text style={styles.sectionOverline}>SECURITY VERIFICATION</Text>
-          <Text style={styles.title}>Biometric Liveness Verification</Text>
-          <Text style={styles.subtitle}>
-            Please position your face within the frame. We need to verify that your babe is not holding you ransom
-          </Text>
+      <View style={styles.body}>
 
-          {step === 'scanning' && (
-            <Animated.View style={[styles.scanContainer, { opacity: fadeAnim }]}>
-              <View style={styles.cameraWrapper}>
-                {permission?.granted ? (
-                  <CameraView style={styles.camera} facing="front" />
-                ) : (
-                  <View style={styles.cameraPlaceholder}>
-                    <Camera size={40} color={COLORS.textMuted} />
-                  </View>
-                )}
-
-                <View style={styles.overlayContainer}>
-                  <View style={styles.statusPills}>
-                    <View style={[styles.statusPill, { backgroundColor: 'rgba(0, 168, 132, 0.95)' }]}>
-                      <CheckCircle2 size={12} color="#fff" />
-                      <Text style={styles.statusText}>Lighting conditions optimal</Text>
-                    </View>
-                    <View style={[styles.statusPill, { backgroundColor: 'rgba(255, 180, 180, 0.95)' }]}>
-                      <AlertCircle size={12} color={COLORS.expense} />
-                      <Text style={[styles.statusText, { color: COLORS.expense }]}>Face partially obscured</Text>
-                    </View>
-                  </View>
-                  <Animated.View style={[styles.faceBox, { transform: [{ scale: pulseAnim }] }]} />
-                  <View style={styles.instructionFloat}>
-                    <Eye size={16} color={COLORS.primary} />
-                    <Text style={styles.instructionFloatText}>
-                      {INSTRUCTIONS[Math.min(instructionIndex, INSTRUCTIONS.length - 1)]}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.stepsList}>
-                <View style={styles.stepItem}>
-                  <View style={[styles.stepIcon, { backgroundColor: COLORS.accentDark }]}>
-                    <Check size={16} color="#fff" />
-                  </View>
-                  <View style={styles.stepTextContainer}>
-                    <Text style={styles.stepTitle}>Frame Detection</Text>
-                    <Text style={styles.stepSub}>Subject centered within operational parameters.</Text>
-                  </View>
-                </View>
-                <View style={styles.stepItem}>
-                  <View style={[styles.stepIcon, { backgroundColor: '#E0E7FF' }]}>
-                    <Loader size={16} color={COLORS.primaryLight} />
-                  </View>
-                  <View style={styles.stepTextContainer}>
-                    <Text style={styles.stepTitle}>Liveness Challenge</Text>
-                    <Text style={styles.stepSub}>Detecting active biometric movement...</Text>
-                  </View>
-                </View>
-                <View style={styles.stepItem}>
-                  <View style={[styles.stepIcon, { backgroundColor: '#E2E8F0' }]}>
-                    <Lock size={16} color={COLORS.textMuted} />
-                  </View>
-                  <View style={styles.stepTextContainer}>
-                    <Text style={[styles.stepTitle, { color: COLORS.textMuted }]}>Ledger Encryption</Text>
-                    <Text style={styles.stepSub}>Finalizing cryptographic verification link.</Text>
-                  </View>
-                </View>
-              </View>
-            </Animated.View>
-          )}
-
-          {step === 'success' && (
-            <View style={styles.resultContainer}>
-              <View style={[styles.resultIcon, { backgroundColor: COLORS.income + '20' }]}>
-                <CheckCircle2 size={60} color={COLORS.income} />
-              </View>
-              <Text style={styles.resultTitle}>Verified!</Text>
-              <Text style={styles.resultSub}>Your identity has been confirmed.</Text>
-              <Button label="Enter Dashboard" onPress={handleSuccess} size="lg" style={styles.btn} />
-            </View>
-          )}
-
-          {step === 'failed' && (
-            <View style={styles.resultContainer}>
-              <View style={[styles.resultIcon, { backgroundColor: COLORS.expense + '20' }]}>
-                <AlertCircle size={60} color={COLORS.expense} />
-              </View>
-              <Text style={styles.resultTitle}>Verification Failed</Text>
-              <Text style={styles.resultSub}>We couldn't confirm your liveness. Please try again.</Text>
-              <Button label="Try Again" onPress={handleRetry} size="lg" style={styles.btn} />
-              <Button label="Cancel Verification" onPress={() => router.back()} size="lg" variant="secondary" style={styles.btn} />
-            </View>
-          )}
+        {/* Shield icon */}
+        <View style={styles.shieldWrap}>
+          <Shield size={26} color={COLORS.primary} />
         </View>
-        {step === 'scanning' && (
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.troubleshootBtn} activeOpacity={0.8}>
-              <HelpCircle size={18} color="#fff" />
-              <Text style={styles.troubleshootBtnText}>Troubleshoot</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()} activeOpacity={0.8}>
-              <Text style={styles.cancelBtnText}>Cancel Verification</Text>
-            </TouchableOpacity>
-            
-            <Text style={styles.footerText}>PROTECTED BY SOVEREIGN LEDGER ENCRYPTION V4.2</Text>
+
+        {/* Title + subtitle */}
+        <Text style={styles.title}>Identity Verification</Text>
+        <Text style={styles.subtitle}>We need to perform a quick liveness check</Text>
+
+        {/* "Center your face" hint pill */}
+        <View style={styles.hintPill}>
+          <View style={styles.hintDot} />
+          <Text style={styles.hintText}>Center your face in the frame</Text>
+        </View>
+
+        {/* ── Camera circle ── */}
+        <Animated.View style={[styles.ringOuter, { transform: [{ scale: pulseAnim }] }]}>
+          <View style={styles.cameraCircle}>
+            {permission?.granted ? (
+              <CameraView style={StyleSheet.absoluteFill} facing="front" />
+            ) : (
+              <View style={styles.cameraPlaceholder}>
+                <Video size={44} color="#9BB4D0" strokeWidth={1.4} />
+              </View>
+            )}
+
+            {/* Scanning overlay */}
+            {phase === 'scanning' && (
+              <View style={styles.scanOverlay}>
+                <Text style={styles.scanText}>Scanning…</Text>
+              </View>
+            )}
           </View>
+        </Animated.View>
+
+        {/* ── Challenge pill (below camera) ── */}
+        {phase === 'challenge' && (
+          <Animated.View
+            style={[
+              styles.challengePill,
+              { opacity: pillOpacity, transform: [{ scale: pillScale }] },
+            ]}
+          >
+            <Text style={styles.challengeText}>{challenge.text}</Text>
+          </Animated.View>
         )}
-      </ScrollView>
+
+        {/* Spacer when no pill so layout doesn't jump */}
+        {phase !== 'challenge' && <View style={styles.pillSpacer} />}
+
+        {/* End-to-end encrypted */}
+        <View style={styles.encRow}>
+          <Lock size={10} color={COLORS.textMuted} />
+          <Text style={styles.encText}>End-to-end encrypted</Text>
+        </View>
+
+        {/* ── Start Verification button ── */}
+        <Animated.View style={[styles.verifyBtnWrap, { opacity: btnOpacity }]}>
+          <TouchableOpacity
+            style={[styles.verifyBtn, isReady && styles.verifyBtnActive]}
+            onPress={handleStartVerification}
+            disabled={!isReady}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.verifyBtnText, !isReady && styles.verifyBtnTextDisabled]}>
+              {phase === 'scanning' ? 'Scanning…' : 'Start Verification →'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Cancel */}
+        <TouchableOpacity onPress={() => router.back()} style={styles.cancelLink}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </TouchableOpacity>
+
+      </View>
     </SafeAreaView>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1, 
-    paddingBottom: SPACING.xl * 2, 
-  },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    backgroundColor: '#F8FAFC', 
+    paddingTop: SPACING.xs,
+    alignItems: 'flex-end',
   },
-  headerBtn: {
-    padding: SPACING.sm,
-  },
-  headerTitle: {
-    color: COLORS.primaryDark,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  securePill: {
-    flexDirection: 'row',
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 212, 170, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-    gap: 4,
+    justifyContent: 'center',
   },
-  secureText: {
-    color: COLORS.accentDark,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  content: {
-    flex: 1, 
-    paddingHorizontal: SPACING.md,
+
+  body: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.sm,
   },
-  sectionOverline: {
-    color: COLORS.primaryDark,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginBottom: SPACING.xs,
-  },
-  title: {
-    color: COLORS.textPrimary,
-    fontSize: 26,
-    fontWeight: '800',
+
+  // Shield
+  shieldWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primary + '14',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: SPACING.sm,
-    letterSpacing: -0.5,
+  },
+
+  // Text
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    letterSpacing: -0.4,
+    textAlign: 'center',
+    marginBottom: 5,
   },
   subtitle: {
+    fontSize: 13,
     color: COLORS.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: SPACING.xl,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
   },
-  scanContainer: {
-    width: '100%',
+
+  // Hint pill
+  hintPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF3FF',
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    gap: 7,
+    marginBottom: SPACING.lg,
   },
-  cameraWrapper: {
-    width: '100%',
-    height: CAM_HEIGHT,
-    borderRadius: RADIUS.xl,
+  hintDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.primary,
+  },
+  hintText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+
+  // Camera circle
+  ringOuter: {
+    width: CIRCLE_SIZE + 12,
+    height: CIRCLE_SIZE + 12,
+    borderRadius: (CIRCLE_SIZE + 12) / 2,
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+    backgroundColor: '#D6E4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+  },
+  cameraCircle: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
     overflow: 'hidden',
-    position: 'relative',
-    marginBottom: SPACING.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    elevation: 5,
-  },
-  camera: {
-    width: '100%',
-    height: '100%',
+    backgroundColor: '#C8DCFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cameraPlaceholder: {
     flex: 1,
-    backgroundColor: COLORS.bg3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#C8DCFF',
+  },
+  scanOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(13, 76, 198, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  overlayContainer: {
-    ...StyleSheet.absoluteFillObject,
-    padding: SPACING.lg,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    zIndex: 10, 
-  },
-  statusPills: {
-    width: '100%',
-    gap: SPACING.sm,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: RADIUS.full,
-    alignSelf: 'flex-start',
-    gap: 6,
-  },
-  statusText: {
+  scanText: {
     color: '#fff',
-    fontSize: 12,
     fontWeight: '700',
+    fontSize: 17,
+    letterSpacing: 0.4,
   },
-  faceBox: {
-    width: 220,
-    height: 140,
-    borderWidth: 2,
-    borderColor: COLORS.accent,
-    borderRadius: RADIUS.md,
-    marginTop: 20,
+
+  // Challenge pill
+  challengePill: {
+    backgroundColor: '#F2E44A',
+    borderRadius: RADIUS.xl,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: 14,
+    alignSelf: 'center',
+    maxWidth: '90%',
+    marginBottom: SPACING.md,
+    shadowColor: '#B8A800',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  instructionFloat: {
+  challengeText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#3A3000',
+    textAlign: 'center',
+  },
+  pillSpacer: {
+    height: 52 + SPACING.md, // matches challengePill height so layout stays stable
+  },
+
+  // Encrypted
+  encRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: 12,
-    borderRadius: RADIUS.full,
-    gap: SPACING.sm,
+    gap: 5,
+    marginBottom: SPACING.md,
+  },
+  encText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+
+  // Verify button
+  verifyBtnWrap: {
+    width: '100%',
     marginBottom: SPACING.sm,
   },
-  instructionFloatText: {
-    color: COLORS.primaryDark,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  stepsList: {
-    gap: SPACING.md,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+  verifyBtn: {
+    width: '100%',
+    backgroundColor: '#C8D6E5',
     borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    gap: SPACING.md,
-  },
-  stepIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepTextContainer: {
-    flex: 1,
+  verifyBtnActive: {
+    backgroundColor: COLORS.primary,
   },
-  stepTitle: {
-    color: COLORS.textPrimary,
+  verifyBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  verifyBtnTextDisabled: {
+    color: '#8FA3BB',
+  },
+
+  // Cancel
+  cancelLink: {
+    paddingVertical: SPACING.sm,
+  },
+  cancelText: {
     fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 2,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
-  stepSub: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  footer: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.xl,
-    marginTop: 'auto', 
-    gap: SPACING.sm,
-  },
-  troubleshootBtn: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primaryDark,
-    borderRadius: RADIUS.md,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  troubleshootBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  cancelBtn: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E0E7FF',
-    borderRadius: RADIUS.md,
-    paddingVertical: 16,
-  },
-  cancelBtnText: {
-    color: COLORS.primaryDark,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  btn: {
-    width: '100%',
-    marginTop: SPACING.sm,
-  },
-  footerText: {
-    color: COLORS.textMuted,
-    fontSize: 9,
-    textAlign: 'center',
-    marginTop: SPACING.md,
-    letterSpacing: 0.8,
-  },
-  resultContainer: {
+
+  // Result screens
+  resultPage: {
     flex: 1,
-    minHeight: 400, 
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
   },
-  resultIcon: {
-    width: 110, height: 110,
-    borderRadius: 55,
+  resultIconCircle: {
+    width: 114,
+    height: 114,
+    borderRadius: 57,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
   },
   resultTitle: {
-    color: COLORS.textPrimary,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
+    color: COLORS.textPrimary,
     marginBottom: SPACING.sm,
+    letterSpacing: -0.4,
   },
   resultSub: {
-    color: COLORS.textSecondary,
     fontSize: 14,
+    color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: SPACING.xl,
