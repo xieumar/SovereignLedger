@@ -1,20 +1,29 @@
 import * as SQLite from 'expo-sqlite';
 import type { Transaction, Budget, AppSettings, CurrencyCode } from '../types';
 
-let db: SQLite.SQLiteDatabase | null = null;
+// ─── Singleton ────────────────────────────────────────────────────────────────
+// Cache the *promise*, not the resolved value.
+// Caching only the resolved value still lets two callers race through the
+// `if (_db)` check before the first openDatabaseAsync resolves, producing
+// two native connections — one of which Android gives a null internal handle.
 
-export const getDB = async (): Promise<SQLite.SQLiteDatabase> => {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync('sovereignledger.db');
+let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+export const getDB = (): Promise<SQLite.SQLiteDatabase> => {
+  if (!_dbPromise) {
+    _dbPromise = SQLite.openDatabaseAsync('sovereignledger.db');
   }
-  return db;
+  return _dbPromise;
 };
 
 export const initDB = async (): Promise<void> => {
-  const database = await getDB();
-  await database.execAsync(`
-    PRAGMA journal_mode = WAL;
+  const db = await getDB();
 
+  // execAsync with multiple statements is unreliable on Android.
+  // Run each DDL statement individually.
+  await db.execAsync(`PRAGMA journal_mode = WAL;`);
+
+  await db.execAsync(`
     CREATE TABLE IF NOT EXISTS transactions (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
@@ -27,7 +36,9 @@ export const initDB = async (): Promise<void> => {
       recurringEndDate TEXT,
       createdAt TEXT NOT NULL
     );
+  `);
 
+  await db.execAsync(`
     CREATE TABLE IF NOT EXISTS budgets (
       id TEXT PRIMARY KEY,
       category TEXT NOT NULL,
@@ -37,28 +48,37 @@ export const initDB = async (): Promise<void> => {
       endDate TEXT NOT NULL,
       createdAt TEXT NOT NULL
     );
+  `);
 
+  await db.execAsync(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
   `);
 
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+  `);
+
   // Seed default settings
-  await database.runAsync(
-    `INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`,
-    ['currency', 'USD']
-  );
-  await database.runAsync(
-    `INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`,
-    ['isVerified', 'false']
-  );
+  await db.runAsync(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, ['currency', 'USD']);
+  await db.runAsync(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, ['isVerified', 'false']);
+  await db.runAsync(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, ['isAuthenticated', 'false']);
+  await db.runAsync(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, ['currentUserId', '']);
 };
 
+// ─── Transactions ─────────────────────────────────────────────────────────────
 
 export const insertTransaction = async (tx: Transaction): Promise<void> => {
-  const database = await getDB();
-  await database.runAsync(
+  const db = await getDB();
+  await db.runAsync(
     `INSERT INTO transactions
       (id, type, amount, category, description, date, isRecurring, recurringFrequency, recurringEndDate, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -73,21 +93,19 @@ export const insertTransaction = async (tx: Transaction): Promise<void> => {
 };
 
 export const getAllTransactions = async (): Promise<Transaction[]> => {
-  const database = await getDB();
-  const rows = await database.getAllAsync<any>(
-    `SELECT * FROM transactions ORDER BY date DESC`
-  );
+  const db = await getDB();
+  const rows = await db.getAllAsync<any>(`SELECT * FROM transactions ORDER BY date DESC`);
   return rows.map(rowToTransaction);
 };
 
 export const deleteTransaction = async (id: string): Promise<void> => {
-  const database = await getDB();
-  await database.runAsync(`DELETE FROM transactions WHERE id = ?`, [id]);
+  const db = await getDB();
+  await db.runAsync(`DELETE FROM transactions WHERE id = ?`, [id]);
 };
 
 export const updateTransaction = async (tx: Transaction): Promise<void> => {
-  const database = await getDB();
-  await database.runAsync(
+  const db = await getDB();
+  await db.runAsync(
     `UPDATE transactions SET
       type=?, amount=?, category=?, description=?, date=?,
       isRecurring=?, recurringFrequency=?, recurringEndDate=?
@@ -118,8 +136,8 @@ const rowToTransaction = (row: any): Transaction => ({
 // ─── Budgets ──────────────────────────────────────────────────────────────────
 
 export const insertBudget = async (budget: Budget): Promise<void> => {
-  const database = await getDB();
-  await database.runAsync(
+  const db = await getDB();
+  await db.runAsync(
     `INSERT INTO budgets (id, category, \`limit\`, period, startDate, endDate, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [budget.id, budget.category, budget.limit, budget.period, budget.startDate, budget.endDate, budget.createdAt]
@@ -127,8 +145,8 @@ export const insertBudget = async (budget: Budget): Promise<void> => {
 };
 
 export const getAllBudgets = async (): Promise<Budget[]> => {
-  const database = await getDB();
-  const rows = await database.getAllAsync<any>(`SELECT * FROM budgets ORDER BY createdAt DESC`);
+  const db = await getDB();
+  const rows = await db.getAllAsync<any>(`SELECT * FROM budgets ORDER BY createdAt DESC`);
   return rows.map((r: any): Budget => ({
     id:        r.id,
     category:  r.category,
@@ -141,30 +159,61 @@ export const getAllBudgets = async (): Promise<Budget[]> => {
 };
 
 export const deleteBudget = async (id: string): Promise<void> => {
-  const database = await getDB();
-  await database.runAsync(`DELETE FROM budgets WHERE id = ?`, [id]);
+  const db = await getDB();
+  await db.runAsync(`DELETE FROM budgets WHERE id = ?`, [id]);
 };
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
 export const getSetting = async (key: string): Promise<string | null> => {
-  const database = await getDB();
-  const row = await database.getFirstAsync<{ value: string }>(
+  const db = await getDB();
+  const row = await db.getFirstAsync<{ value: string }>(
     `SELECT value FROM settings WHERE key = ?`, [key]
   );
   return row?.value ?? null;
 };
 
 export const setSetting = async (key: string, value: string): Promise<void> => {
-  const database = await getDB();
-  await database.runAsync(
+  const db = await getDB();
+  await db.runAsync(
     `INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`, [key, value]
   );
+};
+
+// Writes multiple settings in one transaction — use this for logout so Android
+// only opens a single prepared statement sequence instead of three.
+export const setSettings = async (entries: Record<string, string>): Promise<void> => {
+  const db = await getDB();
+  await db.withTransactionAsync(async () => {
+    for (const [key, value] of Object.entries(entries)) {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`, [key, value]
+      );
+    }
+  });
+};
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+export const insertUser = async (user: any): Promise<void> => {
+  const db = await getDB();
+  await db.runAsync(
+    `INSERT INTO users (id, name, email, password, createdAt) VALUES (?, ?, ?, ?, ?)`,
+    [user.id, user.name, user.email, user.password, user.createdAt]
+  );
+};
+
+export const getUser = async (email: string): Promise<any | null> => {
+  const db = await getDB();
+  return await db.getFirstAsync<any>(`SELECT * FROM users WHERE email = ?`, [email]);
 };
 
 export const getAppSettings = async (): Promise<AppSettings> => {
   const currency = (await getSetting('currency') ?? 'USD') as CurrencyCode;
   const isVerified = (await getSetting('isVerified')) === 'true';
   const verificationExpiry = (await getSetting('verificationExpiry')) ?? undefined;
-  return { currency, isVerified, verificationExpiry };
+  const isAuthenticated = (await getSetting('isAuthenticated')) === 'true';
+  const currentUserId = (await getSetting('currentUserId')) ?? undefined;
+
+  return { currency, isVerified, verificationExpiry, isAuthenticated, currentUserId };
 };

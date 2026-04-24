@@ -1,37 +1,34 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Landmark, User, Mail, Lock, ArrowRight } from 'lucide-react-native';
+import { Landmark, Mail, Lock } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 import { Button } from '@/components/ui';
-
 import { useFinanceStore } from '@/store';
-import { Alert } from 'react-native';
 
-export default function SignupScreen() {
+export default function LoginScreen() {
   const router = useRouter();
-  const { signup } = useFinanceStore();
+  const { login } = useFinanceStore();
   
-  const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
-  const handleSignup = async () => {
-    if (!name || !email || !password) {
+  const handleLogin = async () => {
+    if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
     
     setLoading(true);
-    const success = await signup(name, email, password);
+    const success = await login(email, password);
     setLoading(false);
 
     if (success) {
       router.replace('/liveness');
     } else {
-      Alert.alert('Error', 'Signup failed. Email might already be in use.');
+      Alert.alert('Error', 'Invalid email or password');
     }
   };
 
@@ -41,33 +38,18 @@ export default function SignupScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        {/* Top Header */}
         <View style={styles.header}>
            <Landmark size={20} color={COLORS.primaryDark} />
-           <Text style={styles.headerTitle}>Surveying Expenses</Text>
+           <Text style={styles.headerTitle}>Sovereign Ledger</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.heroSection}>
-            <Text style={styles.title}>Create an Account</Text>
-            <Text style={styles.subtitle}>Secure your financial data today.</Text>
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Log in to manage your finances.</Text>
           </View>
 
           <View style={styles.form}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name</Text>
-              <View style={styles.inputWrap}>
-                <User size={18} color={COLORS.textMuted} />
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="John Doe" 
-                  placeholderTextColor={COLORS.textMuted} 
-                  value={name}
-                  onChangeText={setName}
-                />
-              </View>
-            </View>
-
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email Address</Text>
               <View style={styles.inputWrap}>
@@ -100,16 +82,16 @@ export default function SignupScreen() {
             </View>
 
             <Button 
-              label={loading ? "Creating Account..." : "Sign Up"} 
-              onPress={handleSignup} 
+              label={loading ? "Logging in..." : "Log In"} 
+              onPress={handleLogin} 
               style={styles.btn}
               size="lg"
             />
             
             <View style={styles.footer}>
-              <Text style={styles.footerText}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => router.push('/login' as any)}>
-                <Text style={styles.linkText}>Log In</Text>
+              <Text style={styles.footerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => router.push('/signup' as any)}>
+                <Text style={styles.linkText}>Sign Up</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -131,7 +113,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9'
   },
   headerTitle: { fontSize: 14, fontWeight: '800', color: COLORS.primaryDark },
-  content: { padding: SPACING.xl, paddingTop: 40 },
+  content: { padding: SPACING.xl, paddingTop: 60 },
   heroSection: { marginBottom: 40 },
   title: { fontSize: 32, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 8, textAlign: 'center' },
   subtitle: { fontSize: 15, color: COLORS.textSecondary, textAlign: 'center', fontWeight: '500' },
@@ -151,9 +133,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0'
   },
   input: { flex: 1, fontSize: 15, fontWeight: '600', color: COLORS.textPrimary },
-  
-  btn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, marginTop: 10 },
-  
+  btn: { backgroundColor: COLORS.primaryDark, borderRadius: RADIUS.lg, marginTop: 10 },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 10 },
   footerText: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '500' },
   linkText: { fontSize: 13, color: COLORS.primary, fontWeight: '700' },

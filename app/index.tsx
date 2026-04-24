@@ -19,10 +19,14 @@ export default function Index() {
     );
   }
 
-  // If not verified, go to signup flow
-  // (In a real app, we might check if they have an account first)
+  // If not authenticated, go to login
+  if (!settings.isAuthenticated) {
+    return <Redirect href="/login" />;
+  }
+
+  // If authenticated but not verified (liveness), go to liveness
   if (!settings.isVerified) {
-    return <Redirect href="/signup" />;
+    return <Redirect href="/liveness" />;
   }
 
   // If verified but expired, go to liveness

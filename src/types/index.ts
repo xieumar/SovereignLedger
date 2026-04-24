@@ -54,10 +54,19 @@ export interface CurrencyInfo {
   locale: string;
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+}
+
 export interface AppSettings {
   currency: CurrencyCode;
   isVerified: boolean;
   verificationExpiry?: string;
+  isAuthenticated?: boolean;
+  currentUserId?: string;
 }
 
 export interface SpendingPoint {
