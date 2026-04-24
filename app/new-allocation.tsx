@@ -1,247 +1,274 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Switch, Dimensions } from 'react-native';
+import { 
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, 
+  Switch, Platform, Modal, Dimensions
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Utensils, Car, Banknote, ShoppingBag, Home, MoreHorizontal, Calendar, Bell } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChevronLeft, Utensils, Car, ShoppingBag, Home, MoreHorizontal, Calendar, RefreshCcw, Bell } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants';
-import { Button, Card } from '@/components/ui';
-
 import { useFinanceStore } from '@/store';
-import { TransactionCategory } from '@/types';
+import { useToastStore } from '@/store/toast';
+import { Keypad } from '@/components/Keypad';
+
+const { width } = Dimensions.get('window');
+
+const CATEGORIES = [
+  { id: 'food', label: 'Food', icon: Utensils },
+  { id: 'transport', label: 'Travel', icon: Car },
+  { id: 'groceries', label: 'Grocery', icon: ShoppingBag },
+  { id: 'shopping', label: 'Shop', icon: ShoppingBag },
+  { id: 'rent', label: 'Home', icon: Home },
+  { id: 'other', label: 'Other', icon: MoreHorizontal },
+];
 
 export default function NewAllocationScreen() {
   const router = useRouter();
   const { addBudget } = useFinanceStore();
+  const toast = useToastStore();
+  
   const [amount, setAmount] = useState('0.00');
+  const [selectedCat, setSelectedCat] = useState('food');
   const [timeframe, setTimeframe] = useState('Weekly');
-  const [recurring, setRecurring] = useState(false);
-  const [notify, setNotify] = useState(true);
-  const [selectedCat, setSelectedCat] = useState<TransactionCategory>('food');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [isNotify, setIsNotify] = useState(true);
+  const [showKeypad, setShowKeypad] = useState(false);
 
-  const handleSave = async () => {
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return;
-
-    await addBudget({
-      category: selectedCat,
-      limit: numAmount,
-      period: timeframe.toLowerCase() as any,
-      startDate: new Date().toISOString(),
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // Default 30 days
+  const handleKeyPress = (key: string) => {
+    setAmount(prev => {
+      if (prev === '0.00') return key === '.' ? '0.' : key;
+      if (key === '.' && prev.includes('.')) return prev;
+      return prev + key;
     });
-
-    router.back();
   };
 
-  const categories = [
-    { name: 'Food', id: 'food', icon: Utensils },
-    { name: 'Travel', id: 'transport', icon: Car },
-    { name: 'Salary', id: 'salary', icon: Banknote },
-    { name: 'Shop', id: 'shopping', icon: ShoppingBag },
-    { name: 'Home', id: 'rent', icon: Home },
-    { name: 'Other', id: 'other', icon: MoreHorizontal },
-  ];
+  const handleDelete = () => {
+    setAmount(prev => prev.length > 1 ? prev.slice(0, -1) : '0.00');
+  };
+
+  const handleSave = async () => {
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) {
+      toast.show('Please enter a valid amount', 'error');
+      return;
+    }
+
+    try {
+      await addBudget({
+        category: selectedCat as any,
+        name: CATEGORIES.find(c => c.id === selectedCat)?.label || 'Other',
+        limit: val,
+        period: timeframe.toLowerCase() as any,
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+      toast.show('Allocation saved successfully!', 'success');
+      router.back();
+    } catch (err) {
+      toast.show('Failed to save allocation', 'error');
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronLeft size={24} color={COLORS.primary} />
+          <ChevronLeft size={24} color={COLORS.primaryDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Allocation</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Amount Card */}
-        <Card style={styles.amountCard}>
-          <View style={styles.amountHeader}>
-            <Text style={styles.amountLabel}>AMOUNT</Text>
-            <View style={styles.currencyPill}><Text style={styles.currencyText}>USD</Text></View>
-          </View>
-          <View style={styles.amountWrap}>
+        {/* Amount Section */}
+        <View style={styles.amountCard}>
+          <Text style={styles.amountLabel}>AMOUNT</Text>
+          <TouchableOpacity style={styles.amountDisplay} onPress={() => setShowKeypad(true)}>
             <Text style={styles.currencySymbol}>$</Text>
-            <TextInput 
-              style={styles.amountInput} 
-              value={amount} 
-              onChangeText={setAmount} 
-              keyboardType="numeric"
-            />
+            <Text style={styles.amountText}>{amount}</Text>
+          </TouchableOpacity>
+          <View style={styles.usdBadge}>
+            <Text style={styles.usdText}>USD</Text>
           </View>
-        </Card>
+        </View>
 
-        {/* Category Selector */}
+        {/* Category Selection */}
         <Text style={styles.sectionLabel}>CATEGORY</Text>
-        <View style={styles.grid}>
-          {categories.map((cat) => (
+        <View style={styles.categoryGrid}>
+          {CATEGORIES.map((cat) => (
             <TouchableOpacity 
               key={cat.id} 
-              style={[styles.gridItem, selectedCat === cat.id && styles.gridItemActive]}
-              onPress={() => setSelectedCat(cat.id as any)}
+              style={[styles.catItem, selectedCat === cat.id && styles.catItemActive]}
+              onPress={() => setSelectedCat(cat.id)}
             >
-              <View style={[styles.iconWrap, selectedCat === cat.id && styles.iconWrapActive]}>
-                <cat.icon size={20} color={selectedCat === cat.id ? '#fff' : COLORS.textPrimary} />
+              <View style={[styles.catIconWrap, selectedCat === cat.id && styles.catIconWrapActive]}>
+                <cat.icon size={20} color={selectedCat === cat.id ? COLORS.primary : COLORS.textSecondary} />
               </View>
-              <Text style={[styles.gridLabel, selectedCat === cat.id && styles.gridLabelActive]}>{cat.name}</Text>
+              <Text style={[styles.catLabel, selectedCat === cat.id && styles.catLabelActive]}>{cat.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Timeframe */}
-        <Text style={styles.sectionLabel}>Timeframe</Text>
-        <View style={styles.tabContainer}>
-          {['Daily', 'Weekly', 'Monthly'].map((t) => (
-            <TouchableOpacity 
-              key={t} 
-              style={[styles.tab, timeframe === t && styles.tabActive]}
-              onPress={() => setTimeframe(t)}
-            >
-              <Text style={[styles.tabText, timeframe === t && styles.tabTextActive]}>{t}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Date & Recurring */}
-        <Card style={styles.optionsCard}>
-          <View style={styles.row}>
-            <View style={styles.rowIcon}>
-              <Calendar size={18} color={COLORS.textMuted} />
-            </View>
-            <View style={styles.rowBody}>
-               <Text style={styles.rowLabel}>DATE</Text>
-               <Text style={styles.rowVal}>11/24/2023</Text>
+        {/* Form Fields */}
+        <View style={styles.formCard}>
+          <View style={styles.timeframeHeader}>
+            <Text style={styles.fieldLabel}>Timeframe</Text>
+            <View style={styles.segmentedControl}>
+              {['Daily', 'Weekly', 'Monthly'].map((t) => (
+                <TouchableOpacity 
+                  key={t} 
+                  style={[styles.segment, timeframe === t && styles.segmentActive]}
+                  onPress={() => setTimeframe(t)}
+                >
+                  <Text style={[styles.segmentText, timeframe === t && styles.segmentTextActive]}>{t}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
-          
-          <View style={styles.divider} />
 
           <View style={styles.row}>
             <View style={styles.rowIcon}>
-              <View style={styles.refreshIcon} />
-            </View>
-            <Text style={styles.rowText}>Recurring Transaction</Text>
-            <Switch 
-              value={recurring} 
-              onValueChange={setRecurring} 
-              trackColor={{ false: '#E2E8F0', true: '#00D4AA' }}
-              thumbColor="#fff"
-            />
-          </View>
-        </Card>
-
-        {/* Threshold Alert */}
-        <Text style={styles.sectionLabel}>Threshold Alert</Text>
-        <Card style={styles.alertCard}>
-          <View style={styles.row}>
-            <View style={[styles.rowIcon, { backgroundColor: '#F1F5F9' }]}>
-              <Bell size={18} color={COLORS.primary} />
+              <Calendar size={18} color={COLORS.primary} />
             </View>
             <View style={styles.rowBody}>
-               <Text style={styles.rowTitle}>Notify at 80%</Text>
-               <Text style={styles.rowSub}>LIMITS ARE ALMOST UP!</Text>
+              <Text style={styles.rowLabel}>DATE</Text>
+              <Text style={styles.rowValue}>11/24/2023</Text>
             </View>
+          </View>
+
+          <View style={styles.row}>
+            <View style={styles.rowIcon}>
+              <RefreshCcw size={18} color={COLORS.primary} />
+            </View>
+            <Text style={styles.rowLabelMain}>Recurring Transaction</Text>
             <Switch 
-              value={notify} 
-              onValueChange={setNotify} 
+              value={isRecurring} 
+              onValueChange={setIsRecurring}
               trackColor={{ false: '#E2E8F0', true: COLORS.primary }}
               thumbColor="#fff"
             />
           </View>
-        </Card>
 
-        {/* Notes */}
-        <View style={styles.notesBox}>
-          <Text style={styles.notesLabel}>Notes</Text>
-          <TextInput 
-            style={styles.notesInput} 
-            placeholder="What was this for?" 
-            placeholderTextColor={COLORS.textMuted}
-            multiline
-          />
+          <Text style={styles.fieldLabelAlt}>Threshold Alert</Text>
+          <View style={[styles.row, styles.alertRow]}>
+            <View style={styles.rowIcon}>
+              <Bell size={18} color={COLORS.primary} />
+            </View>
+            <View style={styles.rowBody}>
+              <Text style={styles.alertTitle}>Notify at 80%</Text>
+              <Text style={styles.alertSub}>SPENDING LIMIT</Text>
+            </View>
+            <Switch 
+              value={isNotify} 
+              onValueChange={setIsNotify}
+              trackColor={{ false: '#E2E8F0', true: COLORS.primary }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <View style={styles.notesBox}>
+            <Text style={styles.notesPlaceholder}>What was this for?</Text>
+          </View>
         </View>
 
-        <Button label="Save Up!" onPress={handleSave} style={styles.saveBtn} size="lg" />
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+          <Text style={styles.saveBtnText}>Save Up!</Text>
+        </TouchableOpacity>
       </ScrollView>
+
+      {/* Keypad Modal */}
+      <Modal visible={showKeypad} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowKeypad(false)} />
+          <Keypad 
+            onPress={handleKeyPress}
+            onDelete={handleDelete}
+            onContinue={() => setShowKeypad(false)}
+          />
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-  },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-  },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: COLORS.primaryDark },
-  content: { padding: SPACING.md },
-
-  amountCard: { padding: SPACING.xl, borderRadius: RADIUS.xl, marginBottom: SPACING.xl, alignItems: 'center' },
-  amountHeader: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
-  amountLabel: { fontSize: 9, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1 },
-  currencyPill: { backgroundColor: COLORS.primaryDark, paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.full },
-  currencyText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  amountWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  currencySymbol: { fontSize: 28, fontWeight: '400', color: COLORS.primaryDark, marginTop: 4 },
-  amountInput: { fontSize: 48, fontWeight: '800', color: COLORS.primaryDark, minWidth: 100, textAlign: 'center' },
-
-  sectionLabel: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1, marginBottom: 12, marginLeft: 4 },
-  
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: SPACING.xl },
-  gridItem: { 
-    width: (Dimensions.get('window').width - 64) / 3, 
-    height: 90, 
-    borderRadius: RADIUS.xl, 
-    backgroundColor: '#fff', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#F1F5F9'
-  },
-  gridItemActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '08' },
-  iconWrap: { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  iconWrapActive: { backgroundColor: COLORS.primary },
-  gridLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary },
-  gridLabelActive: { color: COLORS.primary },
-
-  tabContainer: { 
+  header: { 
     flexDirection: 'row', 
-    backgroundColor: '#F1F5F9', 
-    padding: 4, 
-    borderRadius: RADIUS.lg, 
-    marginBottom: SPACING.xl 
+    alignItems: 'center', 
+    paddingHorizontal: SPACING.md, 
+    height: 56,
   },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: RADIUS.md },
-  tabActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
-  tabTextActive: { color: COLORS.primary, fontWeight: '700' },
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: COLORS.primaryDark, marginRight: 40 },
+  content: { padding: SPACING.lg },
+  
+  amountCard: { 
+    backgroundColor: '#fff', 
+    padding: SPACING.xl, 
+    borderRadius: RADIUS.xxl,
+    alignItems: 'center',
+    marginBottom: SPACING.xl,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 15, elevation: 5,
+  },
+  amountLabel: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1, marginBottom: 12 },
+  amountDisplay: { flexDirection: 'row', alignItems: 'flex-start' },
+  currencySymbol: { fontSize: 24, fontWeight: '600', color: COLORS.textMuted, marginTop: 10, marginRight: 4 },
+  amountText: { fontSize: 56, fontWeight: '800', color: COLORS.primaryDark },
+  usdBadge: { 
+    position: 'absolute', top: SPACING.md, right: SPACING.md,
+    backgroundColor: COLORS.primaryDark, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 
+  },
+  usdText: { color: '#fff', fontSize: 10, fontWeight: '800' },
 
-  optionsCard: { padding: 0, borderRadius: RADIUS.xl, marginBottom: SPACING.lg, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', padding: SPACING.lg },
-  rowIcon: { width: 36, height: 36, borderRadius: RADIUS.md, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  sectionLabel: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1, marginBottom: SPACING.md },
+  categoryGrid: { 
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: SPACING.xl 
+  },
+  catItem: { 
+    width: (width - SPACING.lg * 2 - 32) / 3, 
+    aspectRatio: 1, 
+    backgroundColor: '#fff', 
+    borderRadius: RADIUS.xl, 
+    alignItems: 'center', justifyContent: 'center', gap: 8,
+    marginBottom: 12,
+  },
+  catItemActive: { backgroundColor: '#EBF4FF' },
+  catIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  catIconWrapActive: { backgroundColor: '#fff' },
+  catLabel: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
+  catLabelActive: { color: COLORS.primary },
+
+  formCard: { backgroundColor: '#fff', padding: SPACING.lg, borderRadius: RADIUS.xxl, marginBottom: SPACING.xl },
+  timeframeHeader: { marginBottom: SPACING.lg },
+  fieldLabel: { fontSize: 14, fontWeight: '700', color: COLORS.primaryDark, marginBottom: 12 },
+  fieldLabelAlt: { fontSize: 14, fontWeight: '700', color: COLORS.primaryDark, marginTop: SPACING.lg, marginBottom: 12 },
+  segmentedControl: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: RADIUS.lg, padding: 4 },
+  segment: { flex: 1, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.md },
+  segmentActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  segmentText: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
+  segmentTextActive: { color: COLORS.primary },
+
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  rowIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   rowBody: { flex: 1 },
-  rowLabel: { fontSize: 9, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1, marginBottom: 2 },
-  rowVal: { fontSize: 13, fontWeight: '700', color: COLORS.textPrimary },
-  rowText: { flex: 1, fontSize: 14, fontWeight: '700', color: COLORS.textPrimary },
-  divider: { height: 1, backgroundColor: '#F1F5F9' },
-  refreshIcon: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: COLORS.textMuted, borderStyle: 'dotted' },
+  rowLabel: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 0.5 },
+  rowValue: { fontSize: 14, fontWeight: '700', color: COLORS.primaryDark },
+  rowLabelMain: { flex: 1, fontSize: 14, fontWeight: '700', color: COLORS.primaryDark },
+  
+  alertRow: { borderBottomWidth: 0 },
+  alertTitle: { fontSize: 14, fontWeight: '700', color: COLORS.primaryDark },
+  alertSub: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 0.5 },
 
-  alertCard: { padding: 0, borderRadius: RADIUS.xl, marginBottom: SPACING.xl },
-  rowTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 2 },
-  rowSub: { fontSize: 9, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 0.5 },
+  notesBox: { 
+    marginTop: SPACING.md, padding: SPACING.md, backgroundColor: '#F8FAFC', borderRadius: RADIUS.lg, height: 80 
+  },
+  notesPlaceholder: { fontSize: 13, color: COLORS.textMuted, fontWeight: '600' },
 
-  notesBox: { marginBottom: SPACING.xxl, paddingHorizontal: 4 },
-  notesLabel: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1, marginBottom: 8 },
-  notesInput: { fontSize: 14, fontWeight: '600', color: COLORS.textPrimary, minHeight: 60, textAlignVertical: 'top' },
+  saveBtn: { 
+    backgroundColor: COLORS.primaryDark, height: 56, borderRadius: RADIUS.xl, alignItems: 'center', justifyContent: 'center', marginBottom: 40 
+  },
+  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
-  saveBtn: { backgroundColor: COLORS.primaryDark, borderRadius: RADIUS.lg },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
 });

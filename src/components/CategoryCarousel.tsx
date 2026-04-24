@@ -53,7 +53,8 @@ export const CategoryCarousel = () => {
 
   const seenLabels = new Set();
   const uniqueBudgets = budgets.filter(b => {
-    const label = b.name || LABEL_MAP[b.category] || (b.category.charAt(0).toUpperCase() + b.category.slice(1));
+    const rawLabel = b.name || LABEL_MAP[b.category] || (b.category.charAt(0).toUpperCase() + b.category.slice(1));
+    const label = rawLabel.trim().toLowerCase();
     if (seenLabels.has(label)) return false;
     seenLabels.add(label);
     return true;

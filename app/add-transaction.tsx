@@ -8,6 +8,8 @@ import { Button, Card } from '@/components/ui';
 import { useFinanceStore } from '@/store';
 import { TransactionCategory } from '@/types';
 
+import { useToastStore } from '@/store/toast';
+
 const { width: W } = Dimensions.get('window');
 
 type Tab = 'Manual' | 'Capture' | 'UploadData';
@@ -15,6 +17,7 @@ type Tab = 'Manual' | 'Capture' | 'UploadData';
 export default function AddTransactionScreen() {
   const router = useRouter();
   const { addTransaction } = useFinanceStore();
+  const toast = useToastStore();
   const [tab, setTab] = useState<Tab>('Manual');
   const [amount, setAmount] = useState('0.00');
   const [type, setType] = useState<'income' | 'expense'>('expense');
@@ -24,18 +27,25 @@ export default function AddTransactionScreen() {
 
   const handleSave = async () => {
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return;
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast.show('Please enter a valid amount', 'error');
+      return;
+    }
 
-    await addTransaction({
-      type,
-      amount: numAmount,
-      category,
-      description: description || category,
-      date: new Date().toISOString(),
-      isRecurring,
-    });
-
-    router.push('/transactions');
+    try {
+      await addTransaction({
+        type,
+        amount: numAmount,
+        category,
+        description: description || category,
+        date: new Date().toISOString(),
+        isRecurring,
+      });
+      toast.show('Transaction saved successfully!', 'success');
+      router.push('/transactions');
+    } catch (err) {
+      toast.show('Failed to save transaction', 'error');
+    }
   };
 
   const KeypadButton = ({ val, onPress }: { val: string, onPress: (v: string) => void }) => (

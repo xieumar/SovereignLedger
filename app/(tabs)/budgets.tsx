@@ -120,27 +120,37 @@ export default function BudgetsScreen() {
           </TouchableOpacity>
         </View>
 
-        {budgets.map((b) => {
-          const spent = transactions.filter(t => t.category === b.category).reduce((acc, t) => acc + t.amount, 0);
-          const Icon = getIconForName(b.name, b.category);
-          return (
-            <Card key={b.id} style={styles.catItem}>
-              <View style={styles.catItemHeader}>
-                <Icon size={16} color={COLORS.primary} />
-              </View>
-              <Text style={styles.catItemName}>{b.name || b.category.toUpperCase()}</Text>
-              <View style={styles.catItemTrack}>
-                <View style={[styles.catItemFill, { width: `${Math.min(1, spent/b.limit) * 100}%`, backgroundColor: COLORS.primary }]} />
-              </View>
-              <View style={styles.catItemFooter}>
-                <Text style={styles.catItemSpent}>${spent.toLocaleString()}</Text>
-                <Text style={[styles.catItemLeft, { color: spent > b.limit ? COLORS.expense : COLORS.textMuted }]}>
-                  ${Math.max(0, b.limit - spent).toLocaleString()} LEFT
-                </Text>
-              </View>
-            </Card>
-          );
-        })}
+        {(() => {
+          const seenLabels = new Set();
+          return budgets.filter(b => {
+            const rawLabel = b.name || ICON_MAP[b.category] ? (b.category.charAt(0).toUpperCase() + b.category.slice(1).replace('-', ' ')) : 'Other'; 
+            // Wait, let me use a simpler robust check
+            const label = (b.name || b.category).trim().toLowerCase();
+            if (seenLabels.has(label)) return false;
+            seenLabels.add(label);
+            return true;
+          }).map((b) => {
+            const spent = transactions.filter(t => t.category === b.category).reduce((acc, t) => acc + t.amount, 0);
+            const Icon = getIconForName(b.name, b.category);
+            return (
+              <Card key={b.id} style={styles.catItem}>
+                <View style={styles.catItemHeader}>
+                  <Icon size={16} color={COLORS.primary} />
+                </View>
+                <Text style={styles.catItemName}>{b.name || b.category.toUpperCase()}</Text>
+                <View style={styles.catItemTrack}>
+                  <View style={[styles.catItemFill, { width: `${Math.min(1, spent/b.limit) * 100}%`, backgroundColor: COLORS.primary }]} />
+                </View>
+                <View style={styles.catItemFooter}>
+                  <Text style={styles.catItemSpent}>${spent.toLocaleString()}</Text>
+                  <Text style={[styles.catItemLeft, { color: spent > b.limit ? COLORS.expense : COLORS.textMuted }]}>
+                    ${Math.max(0, b.limit - spent).toLocaleString()} LEFT
+                  </Text>
+                </View>
+              </Card>
+            );
+          });
+        })()}
       </ScrollView>
     </SafeAreaView>
   );

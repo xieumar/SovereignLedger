@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   footerPercent: { fontSize: 12, fontWeight: '800', color: COLORS.primaryDark },
   footerLeft: { fontSize: 11, fontWeight: '700', color: COLORS.textMuted },
 
-  newEntryCard: { padding: SPACING.xl, borderRadius: RADIUS.xl, alignItems: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: 'transparent' },
+  newEntryCard: { padding: SPACING.xl, borderRadius: RADIUS.xl, alignItems: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: 'transparent', marginBottom: SPACING.xl },
   newEntryIconWrap: { width: 48, height: 48, borderRadius: RADIUS.lg, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
   newEntryTitle: { fontSize: 17, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 4 },
   newEntrySub: { fontSize: 13, color: COLORS.textMuted, fontWeight: '600', marginBottom: 20 },

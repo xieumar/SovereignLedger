@@ -35,9 +35,18 @@ export const AllocationRow = () => {
 
   if (budgets.length === 0) return null;
 
+  const seenLabels = new Set();
+  const uniqueBudgets = budgets.filter(b => {
+    const rawLabel = b.name || LABEL_MAP[b.category] || (b.category.charAt(0).toUpperCase() + b.category.slice(1).replace('-', ' '));
+    const label = rawLabel.trim().toLowerCase();
+    if (seenLabels.has(label)) return false;
+    seenLabels.add(label);
+    return true;
+  });
+
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.content}>
-      {budgets.map((b) => {
+      {uniqueBudgets.map((b) => {
         const spent = spendingMap[b.category] || 0;
         const left = Math.max(0, b.limit - spent);
         const progress = Math.min(1, spent / b.limit);

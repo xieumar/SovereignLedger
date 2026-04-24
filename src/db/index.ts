@@ -95,7 +95,12 @@ export const initDB = async (): Promise<void> => {
   ];
 
   for (const b of mockBudgets) {
-    await db.runAsync(`INSERT OR IGNORE INTO budgets (id, category, \`limit\`, period, startDate, endDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`, b);
+    // Handle both old (7) and new (8) budget formats for seeding
+    if (b.length === 7) {
+      await db.runAsync(`INSERT OR IGNORE INTO budgets (id, category, \`limit\`, period, startDate, endDate, createdAt, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [...b, null]);
+    } else {
+      await db.runAsync(`INSERT OR IGNORE INTO budgets (id, category, \`limit\`, period, startDate, endDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`, b);
+    }
   }
 
   // Seed matching Transactions to populate the "Spent" amounts

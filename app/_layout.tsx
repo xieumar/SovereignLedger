@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useFinanceStore } from '@/store';
 import { COLORS } from '@/constants';
 
+import { Toast } from '@/components/Toast';
+
 export default function RootLayout() {
   const { initialize, isInitialized } = useFinanceStore();
 
@@ -25,6 +27,7 @@ export default function RootLayout() {
         <Stack.Screen name="liveness" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
+      <Toast />
     </>
   );
 }
