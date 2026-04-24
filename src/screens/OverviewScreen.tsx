@@ -10,6 +10,7 @@ import { EmptyState, Card, SectionHeader} from '@/components/ui';
 import { BalanceCard } from '@/components/BalanceCard';
 import { AllocationRow } from '@/components/AllocationRow';
 import { SplineChart } from '@/components/SplineChart';
+import { FloatingActionButton } from '@/components/FloatingActionButton';
 import { COLORS, SPACING, RADIUS } from '@/constants';
 
 export default function OverviewScreen() {
@@ -26,7 +27,8 @@ export default function OverviewScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -166,11 +168,16 @@ export default function OverviewScreen() {
           </Card>
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+
+      {/* Floating Action Button */}
+      <FloatingActionButton />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   safe: { flex: 1, backgroundColor: COLORS.bg0 },
   scroll: { flex: 1 },
   content: { paddingBottom: 100 },

@@ -1,377 +1,341 @@
-import { COLORS, RADIUS, SPACING } from '@/constants';
-import { useFinanceStore } from '@/store';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions,
+} from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import {
-  AlertCircle,
-  CheckCircle2,
-  Lock,
-  Shield,
-  Video,
-  X,
-} from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  Animated,
-  Dimensions,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Video, CheckCircle2, AlertCircle, Lock, X, Shield } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS, SPACING, RADIUS } from '@/constants';
+import { useFinanceStore } from '@/store';
 
 const { width: W } = Dimensions.get('window');
-const CIRCLE_SIZE = W * 0.72;
+const CIRCLE_SIZE = W * 0.70;
 
-const CHALLENGES = [
-  { id: 'blink', emoji: '👁️', text: "Blink twice if you're safe" },
-  { id: 'nod', emoji: '🙂', text: 'Please nod to open' },
-  { id: 'teeth', emoji: '😁', text: 'Show us your teeth!' },
-  { id: 'ear', emoji: '👂', text: 'Pull your ear' },
-  { id: 'squint', emoji: '😉', text: 'Squint your left eye' },
-  { id: 'brows', emoji: '🤨', text: 'Raise your eyebrows' },
-  { id: 'tongue', emoji: '😛', text: 'Stick out your tongue' },
-  { id: 'wink', emoji: '😜', text: 'Give us a wink' },
-  { id: 'smile', emoji: '😊', text: 'Smile naturally' },
-  { id: 'head_l', emoji: '↩️', text: 'Turn your head left' },
-  { id: 'head_r', emoji: '↪️', text: 'Turn your head right' },
+// Required challenges first, fun ones after
+const ALL_CHALLENGES = [
+  { id: 'blink',  text: "Blink twice if you're safe" },
+  { id: 'nod',    text: 'Please nod to open' },
+  { id: 'teeth',  text: 'Show us your teeth!' },
+  { id: 'ear',    text: 'Pull your ear' },
+  { id: 'squint', text: 'Squint your left eye' },
+  { id: 'brows',  text: 'Raise your eyebrows' },
+  { id: 'tongue', text: 'Stick out your tongue' },
+  { id: 'wink',   text: 'Give us a wink' },
+  { id: 'smile',  text: 'Smile naturally' },
+  { id: 'head_l', text: 'Turn your head left' },
+  { id: 'head_r', text: 'Turn your head right' },
 ];
 
-// Shuffle and pick a subset, keeping required ones first
-function pickChallenges(requiredCount = 2, totalCount = 4) {
-  const required = CHALLENGES.slice(0, requiredCount);
-  const optional = [...CHALLENGES.slice(requiredCount)].sort(() => Math.random() - 0.5);
+function pickChallenges(requiredCount = 2, totalCount = 3) {
+  const required = ALL_CHALLENGES.slice(0, requiredCount);
+  const optional = [...ALL_CHALLENGES.slice(requiredCount)].sort(() => Math.random() - 0.5);
   return [...required, ...optional].slice(0, totalCount);
 }
 
-type Step = 'intro' | 'challenge' | 'ready' | 'scanning' | 'success' | 'failed';
+const FACE_DETECT_MS = 1500; // wait before first challenge appears
+const CHALLENGE_MS   = 2500; // each challenge stays for this long
+
+type Phase = 'intro' | 'challenge' | 'ready' | 'scanning' | 'success' | 'failed';
 
 export default function LivenessScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [step, setStep] = useState<Step>('intro');
-  const [sessionChallenges] = useState(() => pickChallenges(2, 4));
-  const [challengeIndex, setChallengeIndex] = useState(0);
-  const [completedCount, setCompletedCount] = useState(0);
+  const [phase, setPhase] = useState<Phase>('intro');
+  const [challenges] = useState(() => pickChallenges(2, 3));
+  const [idx, setIdx] = useState(-1); // -1 = not started yet
   const { setVerified } = useFinanceStore();
 
-  // Animations
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const pillScaleAnim = useRef(new Animated.Value(0)).current;
-  const pillOpacityAnim = useRef(new Animated.Value(0)).current;
-  const btnOpacityAnim = useRef(new Animated.Value(0.4)).current;
-  const ringColorAnim = useRef(new Animated.Value(0)).current;
+  // ── Animations ──────────────────────────────────────────────────────────────
+  const pulseAnim   = useRef(new Animated.Value(1)).current;
+  const pillOpacity = useRef(new Animated.Value(0)).current;
+  const pillScale   = useRef(new Animated.Value(0.8)).current;
+  const btnOpacity  = useRef(new Animated.Value(0.45)).current;
 
-  // Pulse the camera ring
+  // Pulse ring forever
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.04, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1100, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 1100, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, []);
 
-  // Animate challenge pill in
+  // Pill pop-in whenever idx changes while in challenge phase
   useEffect(() => {
-    if (step === 'challenge' || step === 'ready') {
-      Animated.parallel([
-        Animated.spring(pillScaleAnim, { toValue: 1, friction: 7, tension: 140, useNativeDriver: true }),
-        Animated.timing(pillOpacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [step, challengeIndex]);
+    if (phase !== 'challenge') return;
+    pillOpacity.setValue(0);
+    pillScale.setValue(0.7);
+    Animated.parallel([
+      Animated.spring(pillScale,   { toValue: 1, friction: 6, tension: 150, useNativeDriver: true }),
+      Animated.timing(pillOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]).start();
+  }, [idx, phase]);
 
-  // Animate button becoming active
+  // Button fade in when ready
   useEffect(() => {
-    Animated.timing(btnOpacityAnim, {
-      toValue: step === 'ready' ? 1 : 0.4,
+    Animated.timing(btnOpacity, {
+      toValue: phase === 'ready' ? 1 : 0.45,
       duration: 400,
       useNativeDriver: true,
     }).start();
-  }, [step]);
+  }, [phase]);
 
-  const handleCameraArea = async () => {
-    if (step === 'intro') {
-      if (!permission?.granted) {
-        const result = await requestPermission();
-        if (!result.granted) {
-          Alert.alert('Camera required', 'Please allow camera access to continue.');
-          return;
+  // ── Step 1: Request permission immediately on mount ─────────────────────────
+  useEffect(() => {
+    requestPermission();
+  }, []);
+
+  // ── Step 2: Once permission granted and we're in intro, start after delay ──
+  useEffect(() => {
+    if (!permission?.granted || phase !== 'intro') return;
+    const t = setTimeout(() => {
+      setIdx(0);
+      setPhase('challenge');
+    }, FACE_DETECT_MS);
+    return () => clearTimeout(t);
+  }, [permission?.granted, phase]);
+
+  // ── Step 3: Auto-advance through challenges ─────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'challenge' || idx < 0) return;
+
+    const t = setTimeout(() => {
+      // Fade pill out, then advance
+      Animated.parallel([
+        Animated.timing(pillOpacity, { toValue: 0,    duration: 180, useNativeDriver: true }),
+        Animated.timing(pillScale,   { toValue: 0.85, duration: 180, useNativeDriver: true }),
+      ]).start(() => {
+        const next = idx + 1;
+        if (next >= challenges.length) {
+          setPhase('ready');
+        } else {
+          setIdx(next);
         }
-      }
-      // Show first challenge
-      setChallengeIndex(0);
-      pillScaleAnim.setValue(0);
-      pillOpacityAnim.setValue(0);
-      setStep('challenge');
-    } else if (step === 'challenge') {
-      // Tapping camera area = completing current challenge
-      const next = challengeIndex + 1;
-      const newCompleted = completedCount + 1;
-      setCompletedCount(newCompleted);
+      });
+    }, CHALLENGE_MS);
 
-      if (next >= sessionChallenges.length) {
-        setStep('ready');
-      } else {
-        // Animate out then next challenge in
-        Animated.parallel([
-          Animated.timing(pillScaleAnim, { toValue: 0.8, duration: 150, useNativeDriver: true }),
-          Animated.timing(pillOpacityAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-        ]).start(() => {
-          setChallengeIndex(next);
-          pillScaleAnim.setValue(0);
-          pillOpacityAnim.setValue(0);
-          Animated.parallel([
-            Animated.spring(pillScaleAnim, { toValue: 1, friction: 7, tension: 140, useNativeDriver: true }),
-            Animated.timing(pillOpacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-          ]).start();
-          setStep('challenge');
-        });
-      }
-    }
-  };
+    return () => clearTimeout(t);
+  }, [phase, idx]);
 
-  const handleStartVerification = async () => {
-    if (step !== 'ready') return;
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        Alert.alert('Camera required', 'Please allow camera access to continue.');
-        return;
-      }
-    }
-    setStep('scanning');
-    // Simulate scanning
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  const handleStartVerification = useCallback(() => {
+    if (phase !== 'ready') return;
+    setPhase('scanning');
     setTimeout(() => {
       const ok = Math.random() > 0.1;
       if (ok) {
-        setStep('success');
-        const expiry = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-        setVerified(true, expiry);
+        setVerified(true, new Date(Date.now() + 30 * 60 * 1000).toISOString());
+        setPhase('success');
       } else {
-        setStep('failed');
+        setPhase('failed');
       }
-    }, 3000);
-  };
+    }, 2800);
+  }, [phase]);
 
-  const handleRetry = () => {
-    const fresh = pickChallenges(2, 4);
-    setChallengeIndex(0);
-    setCompletedCount(0);
-    pillScaleAnim.setValue(0);
-    pillOpacityAnim.setValue(0);
-    setStep('intro');
-  };
+  const handleRetry = useCallback(() => {
+    pillOpacity.setValue(0);
+    pillScale.setValue(0.8);
+    btnOpacity.setValue(0.45);
+    setIdx(-1);
+    setPhase('intro');
+  }, []);
 
-  const isVerificationStep = ['intro', 'challenge', 'ready'].includes(step);
-  const currentChallenge = sessionChallenges[Math.min(challengeIndex, sessionChallenges.length - 1)];
-  const isReady = step === 'ready';
+  // ── Current challenge ────────────────────────────────────────────────────────
+  const challenge = challenges[Math.max(0, Math.min(idx, challenges.length - 1))];
+  const isReady   = phase === 'ready';
 
-  // ─── Success ────────────────────────────────────────────────────────────────
-  if (step === 'success') {
+  // ── Success screen ──────────────────────────────────────────────────────────
+  if (phase === 'success') {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.resultPage}>
           <View style={[styles.resultIconCircle, { backgroundColor: '#00D4AA20' }]}>
-            <CheckCircle2 size={64} color={COLORS.income} />
+            <CheckCircle2 size={60} color={COLORS.income} />
           </View>
           <Text style={styles.resultTitle}>Verified!</Text>
           <Text style={styles.resultSub}>Your identity has been confirmed.</Text>
-          <TouchableOpacity style={styles.startBtn} onPress={() => router.replace('/(tabs)')}>
-            <Text style={styles.startBtnText}>Enter Dashboard →</Text>
+          <TouchableOpacity
+            style={[styles.verifyBtn, styles.verifyBtnActive]}
+            onPress={() => router.replace('/(tabs)')}
+          >
+            <Text style={styles.verifyBtnText}>Enter Dashboard →</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // ─── Failed ─────────────────────────────────────────────────────────────────
-  if (step === 'failed') {
+  // ── Failed screen ────────────────────────────────────────────────────────────
+  if (phase === 'failed') {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.resultPage}>
           <View style={[styles.resultIconCircle, { backgroundColor: '#FF475720' }]}>
-            <AlertCircle size={64} color={COLORS.expense} />
+            <AlertCircle size={60} color={COLORS.expense} />
           </View>
           <Text style={styles.resultTitle}>Verification Failed</Text>
-          <Text style={styles.resultSub}>We couldn't confirm your liveness. Please try again.</Text>
-          <TouchableOpacity style={styles.startBtn} onPress={handleRetry}>
-            <Text style={styles.startBtnText}>Try Again</Text>
+          <Text style={styles.resultSub}>
+            We couldn't confirm your liveness. Please try again.
+          </Text>
+          <TouchableOpacity
+            style={[styles.verifyBtn, styles.verifyBtnActive]}
+            onPress={handleRetry}
+          >
+            <Text style={styles.verifyBtnText}>Try Again</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelLink} onPress={() => router.back()}>
-            <Text style={styles.cancelLinkText}>Cancel</Text>
+            <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // ─── Main verification UI ────────────────────────────────────────────────────
+  // ── Main screen ──────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
+
+      {/* Header close button */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <X size={20} color={COLORS.textSecondary} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.closeBtn}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <X size={18} color={COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.body}>
+
         {/* Shield icon */}
         <View style={styles.shieldWrap}>
-          <Shield size={28} color={COLORS.primary} fill={COLORS.primary + '20'} />
+          <Shield size={26} color={COLORS.primary} />
         </View>
 
-        {/* Title */}
+        {/* Title + subtitle */}
         <Text style={styles.title}>Identity Verification</Text>
         <Text style={styles.subtitle}>We need to perform a quick liveness check</Text>
 
-        {/* "Center your face" hint */}
+        {/* "Center your face" hint pill */}
         <View style={styles.hintPill}>
           <View style={styles.hintDot} />
           <Text style={styles.hintText}>Center your face in the frame</Text>
         </View>
 
-        {/* ── Camera circle ── */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={handleCameraArea}
-          style={styles.cameraArea}
-          disabled={step === 'ready' || step === 'scanning'}
-        >
-          <Animated.View style={[styles.ringOuter, { transform: [{ scale: pulseAnim }] }]}>
-            <View style={styles.cameraCircle}>
-              {permission?.granted ? (
-                <CameraView
-                  style={StyleSheet.absoluteFill}
-                  facing="front"
-                />
-              ) : (
-                <View style={styles.cameraPlaceholder}>
-                  <Video size={42} color="#B0C0D4" strokeWidth={1.5} />
-                </View>
-              )}
+        {/* Camera circle */}
+        <Animated.View style={[styles.ringOuter, { transform: [{ scale: pulseAnim }] }]}>
+          <View style={styles.cameraCircle}>
+            {permission?.granted ? (
+              <CameraView style={StyleSheet.absoluteFill} facing="front" />
+            ) : (
+              <View style={styles.cameraPlaceholder}>
+                <Video size={44} color="#9BB4D0" strokeWidth={1.4} />
+              </View>
+            )}
 
-              {/* Scanning overlay */}
-              {step === 'scanning' && (
-                <View style={styles.scanningOverlay}>
-                  <Text style={styles.scanningText}>Scanning…</Text>
-                </View>
-              )}
-            </View>
-          </Animated.View>
-        </TouchableOpacity>
+            {/* Scanning overlay */}
+            {phase === 'scanning' && (
+              <View style={styles.scanOverlay}>
+                <Text style={styles.scanText}>Scanning…</Text>
+              </View>
+            )}
+          </View>
+        </Animated.View>
 
-        {/* Challenge pill */}
-        {(step === 'challenge' || step === 'ready') && (
+        {/* Challenge pill (below camera) */}
+        {phase === 'challenge' ? (
           <Animated.View
             style={[
               styles.challengePill,
-              {
-                opacity: pillOpacityAnim,
-                transform: [{ scale: pillScaleAnim }],
-              },
+              { opacity: pillOpacity, transform: [{ scale: pillScale }] },
             ]}
           >
-            <Text style={styles.challengePillText}>
-              {currentChallenge.emoji}  {currentChallenge.text}
-            </Text>
+            <Text style={styles.challengeText}>{challenge.text}</Text>
           </Animated.View>
-        )}
-
-        {/* Challenge dots */}
-        {(step === 'challenge' || step === 'ready') && (
-          <View style={styles.dotsRow}>
-            {sessionChallenges.map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.dot,
-                  i < completedCount && styles.dotDone,
-                  i === challengeIndex && step === 'challenge' && styles.dotActive,
-                ]}
-              />
-            ))}
-          </View>
+        ) : (
+          <View style={styles.pillSpacer} />
         )}
 
         {/* End-to-end encrypted */}
-        <View style={styles.encryptedRow}>
+        <View style={styles.encRow}>
           <Lock size={10} color={COLORS.textMuted} />
-          <Text style={styles.encryptedText}>End-to-end encrypted</Text>
+          <Text style={styles.encText}>End-to-end encrypted</Text>
         </View>
 
         {/* Start Verification button */}
-        <Animated.View style={[styles.startBtnWrap, { opacity: btnOpacityAnim }]}>
+        <Animated.View style={[styles.verifyBtnWrap, { opacity: btnOpacity }]}>
           <TouchableOpacity
-            style={[styles.startBtn, isReady && styles.startBtnActive]}
+            style={[styles.verifyBtn, isReady && styles.verifyBtnActive]}
             onPress={handleStartVerification}
             disabled={!isReady}
             activeOpacity={0.85}
           >
-            <Text style={[styles.startBtnText, !isReady && styles.startBtnTextDisabled]}>
-              {step === 'scanning' ? 'Scanning…' : 'Start Verification →'}
+            <Text style={[styles.verifyBtnText, !isReady && styles.verifyBtnTextDisabled]}>
+              {phase === 'scanning' ? 'Scanning…' : 'Start Verification →'}
             </Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Cancel */}
         <TouchableOpacity onPress={() => router.back()} style={styles.cancelLink}>
-          <Text style={styles.cancelLinkText}>Cancel</Text>
+          <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
+
       </View>
     </SafeAreaView>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
 
-  // ── Header ──────────────────────────────────────────────────────────────────
   header: {
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
+    paddingTop: SPACING.xs,
     alignItems: 'flex-end',
   },
   closeBtn: {
-    padding: SPACING.sm,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#F1F5F9',
-    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  // ── Body ────────────────────────────────────────────────────────────────────
   body: {
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
+    paddingTop: SPACING.sm,
   },
 
   shieldWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: COLORS.primary + '10',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primary + '14',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
 
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: COLORS.textPrimary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: 5,
   },
   subtitle: {
     fontSize: 13,
@@ -380,15 +344,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
 
-  // ── Hint pill ───────────────────────────────────────────────────────────────
   hintPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF4FF',
+    backgroundColor: '#EEF3FF',
     borderRadius: RADIUS.full,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    gap: 6,
+    gap: 7,
     marginBottom: SPACING.lg,
   },
   hintDot: {
@@ -403,26 +366,23 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
 
-  // ── Camera circle ────────────────────────────────────────────────────────────
-  cameraArea: {
-    marginBottom: SPACING.lg,
-  },
   ringOuter: {
-    width: CIRCLE_SIZE + 10,
-    height: CIRCLE_SIZE + 10,
-    borderRadius: (CIRCLE_SIZE + 10) / 2,
+    width: CIRCLE_SIZE + 12,
+    height: CIRCLE_SIZE + 12,
+    borderRadius: (CIRCLE_SIZE + 12) / 2,
     borderWidth: 3,
     borderColor: COLORS.primary,
+    backgroundColor: '#D6E4FF',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EFF4FF',
+    marginBottom: SPACING.lg,
   },
   cameraCircle: {
     width: CIRCLE_SIZE,
     height: CIRCLE_SIZE,
     borderRadius: CIRCLE_SIZE / 2,
     overflow: 'hidden',
-    backgroundColor: '#D8E6FF',
+    backgroundColor: '#C8DCFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -430,114 +390,91 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#D8E6FF',
+    backgroundColor: '#C8DCFF',
   },
-  scanningOverlay: {
+  scanOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(13, 76, 198, 0.55)',
+    backgroundColor: 'rgba(13, 76, 198, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scanningText: {
+  scanText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 16,
-    letterSpacing: 0.5,
+    fontSize: 17,
+    letterSpacing: 0.4,
   },
 
-  // ── Challenge pill ────────────────────────────────────────────────────────────
   challengePill: {
-    backgroundColor: '#F5E642',
+    backgroundColor: '#F2E44A',
     borderRadius: RADIUS.xl,
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.xl,
     paddingVertical: 14,
-    marginBottom: SPACING.md,
     alignSelf: 'center',
     maxWidth: '90%',
-    shadowColor: '#D4C200',
+    marginBottom: SPACING.md,
+    shadowColor: '#B8A800',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 5,
   },
-  challengePillText: {
+  challengeText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#3D3400',
+    color: '#3A3000',
     textAlign: 'center',
-    letterSpacing: 0.1,
+  },
+  pillSpacer: {
+    height: 52 + SPACING.md,
   },
 
-  // ── Progress dots ─────────────────────────────────────────────────────────────
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: SPACING.md,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E2E8F0',
-  },
-  dotActive: {
-    backgroundColor: COLORS.primary,
-    width: 20,
-  },
-  dotDone: {
-    backgroundColor: COLORS.accent,
-  },
-
-  // ── Encrypted row ─────────────────────────────────────────────────────────────
-  encryptedRow: {
+  encRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     marginBottom: SPACING.md,
   },
-  encryptedText: {
+  encText: {
     fontSize: 11,
     color: COLORS.textMuted,
     fontWeight: '500',
   },
 
-  // ── Start button ──────────────────────────────────────────────────────────────
-  startBtnWrap: {
+  verifyBtnWrap: {
     width: '100%',
     marginBottom: SPACING.sm,
   },
-  startBtn: {
+  verifyBtn: {
     width: '100%',
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#C8D6E5',
     borderRadius: RADIUS.lg,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  startBtnActive: {
+  verifyBtnActive: {
     backgroundColor: COLORS.primary,
   },
-  startBtnText: {
+  verifyBtnText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
-  startBtnTextDisabled: {
-    color: '#94A3B8',
+  verifyBtnTextDisabled: {
+    color: '#8FA3BB',
   },
 
-  // ── Cancel link ───────────────────────────────────────────────────────────────
   cancelLink: {
     paddingVertical: SPACING.sm,
   },
-  cancelLinkText: {
+  cancelText: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.primary,
   },
 
-  // ── Result screens ────────────────────────────────────────────────────────────
   resultPage: {
     flex: 1,
     alignItems: 'center',
@@ -545,19 +482,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
   },
   resultIconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 114,
+    height: 114,
+    borderRadius: 57,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
   },
   resultTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     color: COLORS.textPrimary,
     marginBottom: SPACING.sm,
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
   resultSub: {
     fontSize: 14,
