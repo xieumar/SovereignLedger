@@ -59,22 +59,6 @@ export default function OverviewScreen() {
           style={styles.balanceCard}
         />
 
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickActionBtn}>
-            <ScanLine size={20} color={COLORS.primaryLight} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionBtn}>
-            <Edit size={20} color={COLORS.primaryLight} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionBtn}>
-            <CreditCard size={20} color={COLORS.accentDark} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionBtn}>
-            <Wallet size={20} color={COLORS.accentDark} />
-          </TouchableOpacity>
-        </View>
-
         {/* Allocations */}
         <View style={styles.section}>
           <SectionHeader

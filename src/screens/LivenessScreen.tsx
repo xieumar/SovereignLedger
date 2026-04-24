@@ -153,17 +153,29 @@ export default function LivenessScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.resultPage}>
-          <View style={[styles.resultIconCircle, { backgroundColor: '#00D4AA20' }]}>
-            <CheckCircle2 size={60} color={COLORS.income} />
+          <Card style={styles.successCard}>
+            <View style={styles.successIconCircle}>
+              <CheckCircle2 size={32} color="#fff" fill={COLORS.primaryDark} />
+            </View>
+            <Text style={styles.successTitle}>Verification Successful</Text>
+            <Text style={styles.successSub}>Connecting to your account securely...</Text>
+            
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar} />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.verifyBtn, styles.verifyBtnActive]}
+              onPress={() => router.replace('/(tabs)')}
+            >
+              <Text style={styles.verifyBtnText}>Go to Dashboard →</Text>
+            </TouchableOpacity>
+          </Card>
+          
+          <View style={styles.encRow}>
+            <Lock size={12} color={COLORS.textMuted} />
+            <Text style={styles.encText}>Secured by Enterprise Grade Encryption</Text>
           </View>
-          <Text style={styles.resultTitle}>Verified!</Text>
-          <Text style={styles.resultSub}>Your identity has been confirmed.</Text>
-          <TouchableOpacity
-            style={[styles.verifyBtn, styles.verifyBtnActive]}
-            onPress={() => router.replace('/(tabs)')}
-          >
-            <Text style={styles.verifyBtnText}>Enter Dashboard →</Text>
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -291,13 +303,70 @@ export default function LivenessScreen() {
   );
 }
 
+// Card helper for results
+const Card = ({ children, style }: any) => (
+  <View style={[styles.card, style]}>{children}</View>
+);
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.xl,
+    padding: SPACING.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  successCard: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 40,
+    borderTopWidth: 4,
+    borderTopColor: COLORS.primaryLight,
+  },
+  successIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#D6E4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  successSub: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  progressContainer: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 2,
+    marginBottom: 40,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    width: '60%',
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 2,
+  },
   header: {
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.xs,
@@ -480,6 +549,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.lg,
+    backgroundColor: '#F8FAFC',
   },
   resultIconCircle: {
     width: 114,
