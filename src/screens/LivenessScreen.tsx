@@ -8,7 +8,21 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { 
+  Camera, 
+  useCameraDevice, 
+  useFrameProcessor, 
+  runAsync,
+  Frame,
+  useCameraPermission
+} from 'react-native-vision-camera';
+import { Platform } from 'react-native';
+import { 
+  useFaceDetector, 
+  Face, 
+  FrameFaceDetectionOptions 
+} from 'react-native-vision-camera-face-detector';
+import { Worklets } from 'react-native-worklets-core';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, AlertCircle, Lock } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -52,19 +66,65 @@ type Phase = 'intro' | 'challenge' | 'scanning' | 'success' | 'failed';
 
 export default function LivenessScreen() {
   const router = useRouter();
-  const [permission, requestPermission] = useCameraPermissions();
-  const [phase, setPhase] = useState<Phase>('intro');
-  const [idx, setIdx] = useState(0);
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const [phase, _setPhase] = useState<Phase>('intro');
+  const [idx, _setIdx] = useState(0);
   const { setVerified } = useFinanceStore();
+
+  // Refs for stale closure protection in worklets
+  const phaseRef = useRef<Phase>('intro');
+  const idxRef = useRef(0);
+  const blinkCountRef = useRef(0);
+
+  const setPhase = useCallback((p: Phase) => {
+    phaseRef.current = p;
+    _setPhase(p);
+  }, []);
+
+  const setIdx = useCallback((i: number) => {
+    idxRef.current = i;
+    _setIdx(i);
+  }, []);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pillOpacity = useRef(new Animated.Value(0)).current;
   const pillScale = useRef(new Animated.Value(0.8)).current;
 
-  useEffect(() => {
-    requestPermission();
+  // Face Detection State
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [isCentered, setIsCentered] = useState(false);
+  const [blinkCount, _setBlinkCount] = useState(0);
+  const [isSmiling, setIsSmiling] = useState(false);
+  const lastBlinkRef = useRef(false);
+  const isCompletingRef = useRef(false);
+  const noFaceTimerRef = useRef<any>(null);
+
+  const setBlinkCount = useCallback((c: number | ((prev: number) => number)) => {
+    if (typeof c === 'function') {
+      const next = c(blinkCountRef.current);
+      blinkCountRef.current = next;
+      _setBlinkCount(next);
+    } else {
+      blinkCountRef.current = c;
+      _setBlinkCount(c);
+    }
   }, []);
+
+  // Vision Camera Setup
+  const device = useCameraDevice('front');
+  const faceDetectionOptions = useRef<FrameFaceDetectionOptions>({
+    performanceMode: 'fast',
+    classificationMode: 'all',
+  }).current;
+
+  const { detectFaces } = useFaceDetector(faceDetectionOptions);
+
+  useEffect(() => {
+    if (!hasPermission) {
+      requestPermission();
+    }
+  }, [hasPermission]);
 
   // Pulse animation
   useEffect(() => {
@@ -89,16 +149,93 @@ export default function LivenessScreen() {
       Animated.timing(pillOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
     ]).start();
 
-    const timer = setTimeout(() => {
-      if (idx < CHALLENGES.length - 1) {
-        setIdx(idx + 1);
-      } else {
-        setPhase('scanning');
-      }
-    }, 2500);
-
-    return () => clearTimeout(timer);
+    // Reset challenge state when moving to a new challenge
+    setBlinkCount(0);
+    setIsSmiling(false);
   }, [idx, phase]);
+
+  const moveToNextStep = useCallback(() => {
+    isCompletingRef.current = true;
+    if (idxRef.current < CHALLENGES.length - 1) {
+      setIdx(idxRef.current + 1);
+      // Reset for next challenge
+      blinkCountRef.current = 0;
+      isCompletingRef.current = false;
+    } else {
+      setPhase('scanning');
+      // No need to reset isCompletingRef as we're done with challenges
+    }
+  }, [setIdx, setPhase]);
+
+  // Handle detection events from the frame processor
+  const onFaceDetected = useCallback(
+    Worklets.createRunOnJS((face: Face) => {
+      if (noFaceTimerRef.current) {
+        clearTimeout(noFaceTimerRef.current);
+        noFaceTimerRef.current = null;
+      }
+
+      if (isCompletingRef.current) return;
+      
+      setFaceDetected(true);
+      setIsCentered(true);
+
+      if (phaseRef.current === 'challenge') {
+        const currentChallenge = CHALLENGES[idxRef.current];
+        
+        if (currentChallenge.id === 'blink') {
+          const eyesClosed = (face.leftEyeOpenProbability ?? 1) < 0.3 && (face.rightEyeOpenProbability ?? 1) < 0.3;
+          if (eyesClosed && !lastBlinkRef.current) {
+            setBlinkCount(prev => prev + 1);
+            lastBlinkRef.current = true;
+          } else if (!eyesClosed) {
+            lastBlinkRef.current = false;
+          }
+
+          if (blinkCountRef.current >= 2) {
+            moveToNextStep();
+          }
+        } else if (currentChallenge.id === 'smile') {
+          if ((face.smilingProbability ?? 0) > 0.7) {
+            setIsSmiling(true);
+            moveToNextStep();
+          }
+        } else if (currentChallenge.id === 'nod') {
+          if (Math.abs(face.pitchAngle ?? 0) > 15) {
+            moveToNextStep();
+          }
+        }
+      }
+    }),
+    [moveToNextStep, setBlinkCount]
+  );
+
+  const onNoFace = useCallback(
+    Worklets.createRunOnJS(() => {
+      setFaceDetected(false);
+      setIsCentered(false);
+
+      if (phaseRef.current === 'challenge' && !noFaceTimerRef.current) {
+        noFaceTimerRef.current = setTimeout(() => {
+          setPhase('failed');
+        }, 5000); // Fail after 5 seconds without a face
+      }
+    }),
+    [setPhase]
+  );
+
+  const frameProcessor = useFrameProcessor((frame: Frame) => {
+    'worklet'
+    runAsync(frame, () => {
+      'worklet'
+      const faces = detectFaces(frame);
+      if (faces.length > 0) {
+        onFaceDetected(faces[0]);
+      } else {
+        onNoFace();
+      }
+    });
+  }, [onFaceDetected, onNoFace]);
 
   const handleStartVerification = useCallback(() => {
     setPhase('challenge');
@@ -116,8 +253,22 @@ export default function LivenessScreen() {
   }, [phase]);
 
   const handleRetry = useCallback(() => {
+    if (noFaceTimerRef.current) {
+      clearTimeout(noFaceTimerRef.current);
+      noFaceTimerRef.current = null;
+    }
+    isCompletingRef.current = false;
+    blinkCountRef.current = 0;
     setPhase('intro');
     setIdx(0);
+  }, [setPhase, setIdx]);
+
+  useEffect(() => {
+    return () => {
+      if (noFaceTimerRef.current) {
+        clearTimeout(noFaceTimerRef.current);
+      }
+    };
   }, []);
 
   // ─── Success ─────────────────────────────────────────────────────────────────
@@ -201,18 +352,29 @@ export default function LivenessScreen() {
         <View style={styles.instructionTag}>
           <SvgXml xml={CENTER_FACE_SVG} width={14} height={14} />
           <Text style={styles.instructionText}>
-            {phase === 'scanning' ? 'Processing scan...' : 'Center your face in the frame'}
+            {phase === 'scanning' ? 'Processing scan...' : 
+             faceDetected ? 'Face detected - Keep still' : 'Center your face in the frame'}
           </Text>
         </View>
 
         <View style={styles.mainContent}>
           {/* Circular Face Frame with Camera */}
-          <Animated.View style={[styles.outerCircle, { transform: [{ scale: pulseAnim }] }]}>
+          <Animated.View style={[
+            styles.outerCircle, 
+            { 
+              transform: [{ scale: pulseAnim }],
+              borderColor: faceDetected ? '#22C55E' : '#3B82F6',
+              shadowColor: faceDetected ? '#22C55E' : '#3B82F6',
+            }
+          ]}>
             <View style={styles.innerCircle}>
-              {permission?.granted ? (
-                <CameraView
+              {hasPermission && !!device ? (
+                <Camera
                   style={StyleSheet.absoluteFill}
-                  facing="front"
+                  device={device}
+                  isActive={phase === 'challenge' || phase === 'intro' || phase === 'scanning'}
+                  frameProcessor={frameProcessor}
+                  pixelFormat={Platform.OS === 'android' ? 'yuv' : undefined}
                 />
               ) : (
                 <ActivityIndicator size="large" color={COLORS.primary} />

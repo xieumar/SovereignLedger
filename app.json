@@ -46,7 +46,8 @@
           }
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "react-native-vision-camera"
     ],
     "experiments": {
       "typedRoutes": true
