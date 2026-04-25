@@ -8,8 +8,8 @@ import { COLORS, SPACING, RADIUS } from '@/constants';
 
 const TAB_ICONS: Record<string, any> = {
   index:          LayoutDashboard,
-  analytics:      BarChart3,
   budgets:        Target,
+  analytics:      BarChart3,
   settings:       Settings,
 };
 
@@ -68,8 +68,8 @@ export default function TabsLayout() {
           tabBarLabel: () => null,
         }}
       />
-      <Tabs.Screen name="analytics" />
       <Tabs.Screen name="budgets" />
+      <Tabs.Screen name="analytics" />
       <Tabs.Screen name="allocations" options={{ href: null }} />
       <Tabs.Screen name="monthly-burn" options={{ href: null }} />
     </Tabs>

@@ -19,20 +19,8 @@ export default function Index() {
     );
   }
 
-  // If not authenticated, go to login
-  if (!settings.isAuthenticated) {
-    return <Redirect href="/login" />;
-  }
-
-  // If authenticated but not verified (liveness), go to liveness
-  if (!settings.isVerified) {
-    return <Redirect href="/liveness" />;
-  }
-
-  // If verified but expired, go to liveness
-  if (settings.verificationExpiry && new Date(settings.verificationExpiry) < new Date()) {
-    return <Redirect href="/liveness" />;
-  }
+  // FOR TESTING: Always go to liveness to verify the new design and camera
+  return <Redirect href="/liveness" />;
 
   return <Redirect href="/(tabs)" />;
 }

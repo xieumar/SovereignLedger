@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "SovereignLedger",
-    "slug": "xiaomao",
+    "slug": "godabeg",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -45,7 +45,8 @@
             "minSdkVersion": 26
           }
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
@@ -54,9 +55,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ee76c398-ea41-4c9b-83f4-3776ecf62a0c"
+        "projectId": "0e8dc7c6-055a-4dc1-af56-55be7f8e852d"
       }
     },
-    "owner": "zainabumaribrahim"
+    "owner": "zainabuis-organization"
   }
 }

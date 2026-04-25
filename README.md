@@ -66,3 +66,9 @@ The app uses a custom-built Facial Liveness Verification system. This system res
 ## Data Persistence
 
 SovereignLedger utilizes an SQLite database via expo-sqlite to store all transactions, budgets, and settings. This ensures that your data is persistent across app restarts without relying on an external server.
+## Future Roadmap
+
+- **Enhanced Biometrics**: Transition from the current high-fidelity UI liveness simulator to full production-grade native SDK integration (e.g., Regula Forensics) for enterprise-level security.
+- **Server-Side Verification**: Implement remote cryptographic signing of liveness packets to prevent local device tampering.
+- **Multi-Account Sync**: Optional encrypted cloud backup and cross-device synchronization.
+- **Advanced Analytics**: Deeper financial insights and predictive spending behavior modeling.
