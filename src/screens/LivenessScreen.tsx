@@ -12,7 +12,6 @@ import {
   Camera, 
   useCameraDevice, 
   useFrameProcessor, 
-  runAsync,
   Frame,
   useCameraPermission
 } from 'react-native-vision-camera';
@@ -224,18 +223,15 @@ export default function LivenessScreen() {
     [setPhase]
   );
 
-  const frameProcessor = useFrameProcessor((frame: Frame) => {
-    'worklet'
-    runAsync(frame, () => {
-      'worklet'
-      const faces = detectFaces(frame);
-      if (faces.length > 0) {
-        onFaceDetected(faces[0]);
-      } else {
-        onNoFace();
-      }
-    });
-  }, [onFaceDetected, onNoFace]);
+ const frameProcessor = useFrameProcessor((frame: Frame) => {
+  'worklet'
+  const faces = detectFaces(frame);
+  if (faces.length > 0) {
+    onFaceDetected(faces[0]);
+  } else {
+    onNoFace();
+  }
+}, [onFaceDetected, onNoFace]);
 
   const handleStartVerification = useCallback(() => {
     setPhase('challenge');
