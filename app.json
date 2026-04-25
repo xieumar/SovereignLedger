@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "SovereignLedger",
-    "slug": "sovereignledger",
+    "slug": "xiaomao",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.sovereignledger.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "SovereignLedger uses your camera for facial liveness verification to secure your financial dashboard.",
+        "NSCameraUsageDescription": "Allow SovereignLedger to access your camera for liveness verification.",
         "NSFaceIDUsageDescription": "SovereignLedger uses Face ID to protect access to your financial data."
       }
     },
@@ -26,7 +26,9 @@
         "backgroundColor": "#0A0E1A"
       },
       "package": "com.sovereignledger.app",
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -37,15 +39,24 @@
       "expo-router",
       "expo-sqlite",
       [
-        "expo-camera",
+        "expo-build-properties",
         {
-          "cameraPermission": "Allow SovereignLedger to access your camera for liveness verification."
+          "android": {
+            "minSdkVersion": 26
+          }
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
     },
-    "scheme": "sovereignledger"
+    "scheme": "sovereignledger",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ee76c398-ea41-4c9b-83f4-3776ecf62a0c"
+      }
+    },
+    "owner": "zainabumaribrahim"
   }
 }
